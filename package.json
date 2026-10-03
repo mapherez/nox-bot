@@ -10,7 +10,8 @@
     "build": "tsc && node scripts/copy-runtime-files.mjs",
     "copy:assets": "node scripts/copy-runtime-files.mjs",
     "refresh": "node --loader ts-node/esm refresh-commands.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test tests/*.test.mjs"
   },
   "keywords": [],
   "author": "",

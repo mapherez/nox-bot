@@ -24,7 +24,7 @@ async function createSlashCommands() {
       try {
         const filePath = path.join(commandsPath, file);
         const fileUrl = pathToFileURL(filePath).href;
-        console.log(`[COMMAND_LOADER] Loading command from: ${fileUrl}`);
+        Logger.info(`[COMMAND_LOADER] Loading command from: ${fileUrl}`);
         const command = await import(fileUrl);
 
         // Support both default exports and named exports

@@ -2,6 +2,8 @@
 
 A modern, modular Discord bot built with **TypeScript** and Discord.js v14, featuring a unified command system with dynamically loaded subcommands and real-time weather integration.
 
+An optional [control API v1](docs/control-api.md) provides authenticated machine-readable status, guild/channel selection and text-message sending for external clients. It is disabled by default and uses a separate API key. See the API guide for runtime versions and the optional Docker Compose override.
+
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-blue.svg)](https://www.typescriptlang.org/)
 [![Discord.js](https://img.shields.io/badge/Discord.js-v14-blue.svg)](https://discord.js.org/)
@@ -275,7 +277,8 @@ npm run dev    # Start the bot in watch mode for development (auto-restart on ch
 npm run build  # Compile TypeScript to JavaScript (outputs to dist/)
 npm run prod   # Build and run the production version
 npm run refresh # Refresh Discord slash commands (clears existing, registers new)
-npm test       # Run tests (placeholder)
+npm run typecheck # Check TypeScript without emitting files
+npm test       # Build and run offline API, Discord service and regression tests
 ```
 
 ## 🤝 Contributing

@@ -1,3 +1,4 @@
+import Logger from "../utils/logger.js";
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import fs from 'fs';
 import path from 'path';
@@ -126,7 +127,7 @@ const createCommand = async () => ({
         await subcommands[subcommand](interaction, '');
       }
     } catch (error) {
-      console.error("Error in nox command:", error);
+      Logger.error("Error in nox command:", error);
       await interaction.reply({
         content: "Sorry, I encountered an error while processing your request.",
         ephemeral: true,

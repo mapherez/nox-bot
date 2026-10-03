@@ -1,3 +1,4 @@
+import Logger from "../../utils/logger.js";
 import axios from 'axios';
 import { ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 
@@ -114,7 +115,7 @@ async function weather(interaction: ChatInputCommandInteraction, location: strin
     await interaction.reply({ embeds: [weatherEmbed] });
 
   } catch (error) {
-    console.error('Weather API error:', (error as any).response?.data || (error as Error).message);
+    Logger.error('Weather API error:', (error as any).response?.data || (error as Error).message);
 
     let errorMessage = '❌ Sorry, I couldn\'t fetch the weather data right now.';
 

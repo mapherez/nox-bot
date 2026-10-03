@@ -1,10 +1,10 @@
 import Logger from "./logger.js";
 
 class EnvironmentValidator {
-  static validate() {
+  static validate(env: NodeJS.ProcessEnv = process.env) {
     const required = ["DISCORD_TOKEN", "CLIENT_ID"];
 
-    const missing = required.filter((key) => !process.env[key]);
+    const missing = required.filter((key) => !env[key]);
 
     if (missing.length > 0) {
       Logger.error(
@@ -13,14 +13,14 @@ class EnvironmentValidator {
       Logger.info(
         "Please check your .env file and ensure all required variables are set."
       );
-      process.exit(1);
+      throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
     }
 
     // Validate token format (basic check)
     if (
-      !process.env.DISCORD_TOKEN ||
-      !process.env.DISCORD_TOKEN.startsWith("MT") ||
-      process.env.DISCORD_TOKEN.length < 50
+      !env.DISCORD_TOKEN ||
+      !env.DISCORD_TOKEN.startsWith("MT") ||
+      env.DISCORD_TOKEN.length < 50
     ) {
       Logger.warn(
         "DISCORD_TOKEN appears to be invalid. Please check your bot token."
@@ -28,7 +28,7 @@ class EnvironmentValidator {
     }
 
     // Validate client ID format (should be numeric)
-    if (!process.env.CLIENT_ID || !/^\d+$/.test(process.env.CLIENT_ID)) {
+    if (!env.CLIENT_ID || !/^\d+$/.test(env.CLIENT_ID)) {
       Logger.warn(
         "CLIENT_ID appears to be invalid. It should be a numeric ID."
       );

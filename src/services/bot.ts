@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits } from "discord.js";
+import { Client, GatewayIntentBits, type ClientEvents } from "discord.js";
 import Logger from "../utils/logger.js";
 import {
   loadPrefixCommands as loadPrefixCommandsFromFile,
@@ -10,6 +10,8 @@ class Bot {
   client: Client;
   commandHandler: any;
   prefixCommands: Record<string, string>;
+  private readonly eventHandlers: Array<{ event: string; listener: (...args: any[]) => void }> = [];
+  private destruction?: Promise<void>;
 
   constructor(intents: GatewayIntentBits[]) {
     this.client = new Client({ intents });
@@ -27,11 +29,19 @@ class Bot {
   }
 
   setupEventHandlers() {
-    this.client.once("clientReady", () => {
+    const once = <K extends keyof ClientEvents>(event: K, listener: (...args: ClientEvents[K]) => void) => {
+      this.eventHandlers.push({ event, listener });
+      this.client.once(event, listener);
+    };
+    const on = <K extends keyof ClientEvents>(event: K, listener: (...args: ClientEvents[K]) => void) => {
+      this.eventHandlers.push({ event, listener });
+      this.client.on(event, listener);
+    };
+    once("clientReady", () => {
       Logger.success(`Bot online as ${this.client.user?.tag}`);
     });
 
-    this.client.on("interactionCreate", async (interaction) => {
+    on("interactionCreate", async (interaction) => {
       if (interaction.isButton()) {
         const customId = interaction.customId;
 
@@ -72,7 +82,7 @@ class Bot {
       }
     });
 
-    this.client.on("messageCreate", async (message) => {
+    on("messageCreate", async (message) => {
       if (message.author.bot) return; // Ignore bot messages
 
       if (message.content.startsWith("!")) {
@@ -131,11 +141,11 @@ class Bot {
       }
     });
 
-    this.client.on("error", (error) => {
+    on("error", (error) => {
       Logger.error("Client error:", error);
     });
 
-    this.client.on("warn", (warning) => {
+    on("warn", (warning) => {
       Logger.warn("Client warning:", warning);
     });
   }
@@ -150,12 +160,19 @@ class Bot {
     }
   }
 
-  async destroy() {
-    if (this.client) {
-      Logger.info("Shutting down bot...");
-      await this.client.destroy();
-      Logger.success("Bot shut down successfully");
+  destroy(): Promise<void> {
+    if (!this.destruction) this.destruction = this.destroyClient();
+    return this.destruction;
+  }
+
+  private async destroyClient(): Promise<void> {
+    Logger.info("Shutting down bot...");
+    try { await this.client.destroy(); }
+    finally {
+      for (const { event, listener } of this.eventHandlers) this.client.off(event, listener);
+      this.eventHandlers.length = 0;
     }
+    Logger.success("Bot shut down successfully");
   }
 }
 

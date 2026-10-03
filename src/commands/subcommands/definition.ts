@@ -1,3 +1,4 @@
+import Logger from "../../utils/logger.js";
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { createRequire } from "node:module";
@@ -17,34 +18,34 @@ let ptDictInstance: any = null;
 
 async function loadPortugueseDictionary() {
   if (!ptDictInstance) {
-    console.log('[DICT] Loading Portuguese dictionary with nodehun...');
+    Logger.info('[DICT] Loading Portuguese dictionary with nodehun...');
     try {
       // Load the .aff and .dic files from the assets directory
       const affPath = join(__dirname, '../../assets/dictionaries/portuguese/pt_PT.aff');
       const dicPath = join(__dirname, '../../assets/dictionaries/portuguese/pt_PT.dic');
 
-      console.log(`[DICT] Loading affix file: ${affPath}`);
-      console.log(`[DICT] Loading dictionary file: ${dicPath}`);
+      Logger.info(`[DICT] Loading affix file: ${affPath}`);
+      Logger.info(`[DICT] Loading dictionary file: ${dicPath}`);
 
       const affix = readFileSync(affPath);
       const dictionary = readFileSync(dicPath);
 
       ptDictInstance = new Nodehun(affix, dictionary);
-      console.log('[DICT] Portuguese dictionary loaded successfully with nodehun');
+      Logger.info('[DICT] Portuguese dictionary loaded successfully with nodehun');
 
     } catch (error) {
-      console.error('[DICT] Failed to load Portuguese dictionary:', (error as Error).message);
+      Logger.error('[DICT] Failed to load Portuguese dictionary:', (error as Error).message);
       ptDictInstance = null;
     }
   } else {
-    console.log('[DICT] Dictionary already loaded, returning cached instance');
+    Logger.info('[DICT] Dictionary already loaded, returning cached instance');
   }
   return ptDictInstance;
 }
 
 // Function to correct Portuguese accents
 async function correctPortugueseAccents(word: string): Promise<string> {
-  console.log(`[ACCENTS] Starting accent correction for word: "${word}"`);
+  Logger.info(`[ACCENTS] Starting accent correction for word: "${word}"`);
 
   try {
     // Set a timeout for dictionary loading (5 seconds max)
@@ -54,31 +55,31 @@ async function correctPortugueseAccents(word: string): Promise<string> {
     );
 
     const dict = await Promise.race([dictPromise, timeoutPromise]);
-    console.log(`[ACCENTS] Dictionary loaded: ${dict ? 'YES' : 'NO'}`);
+    Logger.info(`[ACCENTS] Dictionary loaded: ${dict ? 'YES' : 'NO'}`);
 
     if (!dict) {
-      console.log(`[ACCENTS] No dictionary available, returning original word: "${word}"`);
+      Logger.info(`[ACCENTS] No dictionary available, returning original word: "${word}"`);
       return word; // Fallback if dictionary fails to load
     }
 
-    console.log(`[ACCENTS] Checking if word "${word}" is correct...`);
+    Logger.info(`[ACCENTS] Checking if word "${word}" is correct...`);
     // If the word is already correct, return it
     if (await dict.spell(word)) {
-      console.log(`[ACCENTS] Word "${word}" is already correct`);
+      Logger.info(`[ACCENTS] Word "${word}" is already correct`);
       return word;
     }
 
-    console.log(`[ACCENTS] Word "${word}" is not correct, getting suggestions...`);
+    Logger.info(`[ACCENTS] Word "${word}" is not correct, getting suggestions...`);
     // Get suggestions
     const suggestions = await dict.suggest(word);
-    console.log(`[ACCENTS] Got suggestions:`, suggestions);
+    Logger.info(`[ACCENTS] Got suggestions:`, suggestions);
 
     if (!suggestions || suggestions.length === 0) {
-      console.log(`[ACCENTS] No suggestions, returning original word: "${word}"`);
+      Logger.info(`[ACCENTS] No suggestions, returning original word: "${word}"`);
       return word; // No suggestions, return original
     }
 
-    console.log(`[ACCENTS] Filtering for accented suggestions...`);
+    Logger.info(`[ACCENTS] Filtering for accented suggestions...`);
     // Look for suggestions that are similar in length and structure
     // but have accents (contain characters like á, é, í, ó, ú, â, ê, ô, ã, õ, ç)
     const accentedSuggestions = suggestions.filter((suggestion: string) => {
@@ -88,16 +89,16 @@ async function correctPortugueseAccents(word: string): Promise<string> {
              Math.abs(suggestion.length - word.length) <= 2;
     });
 
-    console.log(`[ACCENTS] Found ${accentedSuggestions.length} accented suggestions:`, accentedSuggestions);
+    Logger.info(`[ACCENTS] Found ${accentedSuggestions.length} accented suggestions:`, accentedSuggestions);
 
     // Return the first accented suggestion, or the first suggestion if none have accents
     const result = accentedSuggestions.length > 0 ? accentedSuggestions[0] : suggestions[0];
-    console.log(`[ACCENTS] Returning: "${result}"`);
+    Logger.info(`[ACCENTS] Returning: "${result}"`);
     return result;
 
   } catch (error) {
-    console.error(`[ACCENTS] Error in accent correction:`, (error as Error).message);
-    console.log(`[ACCENTS] Returning original word due to error: "${word}"`);
+    Logger.error(`[ACCENTS] Error in accent correction:`, (error as Error).message);
+    Logger.info(`[ACCENTS] Returning original word due to error: "${word}"`);
     return word; // Always return the original word on error
   }
 }
@@ -120,19 +121,19 @@ async function definition(interaction: ChatInputCommandInteraction, word: string
 
     // Show that we're processing (MUST respond within 3 seconds)
     await interaction.deferReply();
-    console.log(`[DEFINITION] Deferred reply for: "${cleanWord}"`);
+    Logger.info(`[DEFINITION] Deferred reply for: "${cleanWord}"`);
 
-    console.log(`[DEFINITION] About to call correctPortugueseAccents...`);
+    Logger.info(`[DEFINITION] About to call correctPortugueseAccents...`);
     // Try to correct Portuguese accents (after deferring)
     const correctedWordResult = await correctPortugueseAccents(cleanWord);
-    console.log(`[DEFINITION] correctPortugueseAccents returned: "${correctedWordResult}"`);
+    Logger.info(`[DEFINITION] correctPortugueseAccents returned: "${correctedWordResult}"`);
     const wordWasCorrected = correctedWordResult !== cleanWord;
 
-    console.log(`[DEFINITION] Corrected word: "${correctedWordResult}" (was corrected: ${wordWasCorrected})`);
+    Logger.info(`[DEFINITION] Corrected word: "${correctedWordResult}" (was corrected: ${wordWasCorrected})`);
 
     // Make request to Priberam
     const url = `https://dicionario.priberam.org/${encodeURIComponent(correctedWordResult)}`;
-    console.log(`[DEFINITION] Fetching URL: ${url}`);
+    Logger.info(`[DEFINITION] Fetching URL: ${url}`);
 
     const response = await axios.get(url, {
       timeout: 8000, // Reduced timeout to 8 seconds
@@ -141,7 +142,7 @@ async function definition(interaction: ChatInputCommandInteraction, word: string
       }
     });
 
-    console.log(`[DEFINITION] Got response from Priberam, status: ${response.status}`);
+    Logger.info(`[DEFINITION] Got response from Priberam, status: ${response.status}`);
 
     // Parse HTML with cheerio
     const $ = cheerio.load(response.data);
@@ -149,7 +150,7 @@ async function definition(interaction: ChatInputCommandInteraction, word: string
     // Find the first imagemdef image
     const definitionImage = $('img.imagemdef').first();
 
-    console.log(`[DEFINITION] Found ${definitionImage.length} imagemdef images`);
+    Logger.info(`[DEFINITION] Found ${definitionImage.length} imagemdef images`);
 
     if (definitionImage.length > 0) {
       const imageSrc = definitionImage.attr('src');
@@ -194,7 +195,7 @@ async function definition(interaction: ChatInputCommandInteraction, word: string
           });
 
         } catch (imageError) {
-          console.error('Error downloading image:', (imageError as Error).message);
+          Logger.error('Error downloading image:', (imageError as Error).message);
           // Fallback to link if image download fails
           const embed = {
             color: 0x0099ff,
@@ -227,16 +228,16 @@ async function definition(interaction: ChatInputCommandInteraction, word: string
     }
 
   } catch (error) {
-    console.error('Error fetching definition:', error);
+    Logger.error('Error fetching definition:', error);
 
     if ((error as any).code === 'ECONNABORTED') {
-      console.log('[DEFINITION] Timeout error - Priberam took too long to respond');
+      Logger.info('[DEFINITION] Timeout error - Priberam took too long to respond');
       await interaction.editReply('❌ Timeout: O dicionário Priberam demorou muito para responder. Tente novamente mais tarde.');
     } else if ((error as any).response && (error as any).response.status === 404) {
-      console.log(`[DEFINITION] Word "${correctedWord}" not found (404)`);
+      Logger.info(`[DEFINITION] Word "${correctedWord}" not found (404)`);
       await interaction.editReply(`❌ Palavra "${correctedWord}" não encontrada no dicionário Priberam.`);
     } else {
-      console.log('[DEFINITION] Unexpected error:', (error as Error).message);
+      Logger.info('[DEFINITION] Unexpected error:', (error as Error).message);
       await interaction.editReply('❌ Ocorreu um erro ao procurar a definição. Tente novamente mais tarde.');
     }
   }

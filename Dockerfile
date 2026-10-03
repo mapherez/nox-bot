@@ -22,7 +22,8 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY scripts ./scripts
 
-RUN npm run build
+ARG NOX_DISCORD_BUILD_VERSION=dev
+RUN NOX_DISCORD_BUILD_VERSION="$NOX_DISCORD_BUILD_VERSION" npm run build
 
 # Keep compiled production dependencies from the builder so native modules do not rebuild in runtime.
 RUN npm prune --omit=dev \
