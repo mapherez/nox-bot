@@ -10,7 +10,7 @@ yarn-error.log*
 *.log
 .DS_Store
 
-# Keep private prefix commands out of the baked image.
+# Keep private legacy import sources out of the baked image.
 src/config/prefix-commands.json
 prefix-commands.json
 

@@ -11,7 +11,7 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# Local custom prefix commands
+# Private legacy command import sources
 src/config/prefix-commands.json
 **/prefix-commands.json
 

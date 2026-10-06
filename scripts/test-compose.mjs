@@ -19,7 +19,7 @@ await writeFile(
   file,
   original
     .replaceAll(
-      "image: ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-pi5}",
+      "image: ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-latest}",
       `image: ${image}`,
     )
     .replaceAll("    image:", `    platform: linux/${architecture}\n    image:`)

@@ -19,7 +19,7 @@ Local validation performed on 6 October 2026 with Node 24.21.0 and Docker Deskto
 | Docker SIGTERM | API drained and Discord destroyed with exit code 0, within one second on both architectures |
 | Branding and legacy runtime audit | Obsolete product names, loaders, global registrar and manual refresh removed |
 
-ARM64 execution used Docker emulation on the development host. These checks establish image/runtime compatibility; they do not establish performance or operation on physical Raspberry Pi hardware.
+ARM64 execution used Docker emulation on the development host. These checks establish image/runtime compatibility; they do not measure performance on physical ARM64 hardware.
 
 The standalone CLI invoked through a Linux container over the Windows checkout cannot discover the Windows workspace's `tsc` launcher and reports that fact. Independent strict workspace typechecks pass. Docker builds provide a native Linux launcher, and the official module build/typecheck passes there without that warning.
 
@@ -70,7 +70,7 @@ Fakes do not establish actual Discord OAuth or command registration state. Compl
 5. Stop only SpacetimeDB after initialization. Confirm live commands, messaging, help and existing sessions keep working; configuration writes/new logins are refused; `/health` distinguishes functional readiness from degraded synchronization. Restart the DB and verify snapshot recovery before saves reopen. Restart the whole application while the DB is down and confirm it waits for state.
 6. Exercise two browsers through the actual proxy, including long-lived SSE, mobile keyboard/focus, preserved drafts, conflicts, server-specific secrets and explicit secret replacement/removal. Confirm Control API bearer/permissions and deployment shutdown.
 
-External operations remain manual: rename GitHub to `nox-bot`, update remotes and GHCR links, change Discord Developer Portal branding and register OAuth callback. No workflow was executed, no image was published, and no release/tag or remote configuration was created.
+External setup remains manual: configure Discord Developer Portal branding and register the OAuth callback. No workflow was executed, no image was published, and no release/tag or remote configuration was created.
 
 ## Official references
 

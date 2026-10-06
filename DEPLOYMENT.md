@@ -1,6 +1,6 @@
 # NoX Bot deployment
 
-The same Compose stack supports `linux/arm64` (including Raspberry Pi 5) and `linux/amd64`. Node 24 runs the bot and dashboard. SpacetimeDB 2.10.2 runs on the same host with private networking and persistent data/signing-key volumes.
+The same Compose stack supports `linux/amd64` and `linux/arm64`, with no primary hardware platform. Node 24 runs the bot and dashboard. SpacetimeDB 2.10.2 runs on the same host with private networking and persistent data/signing-key volumes.
 
 ## Prepare
 
@@ -47,4 +47,4 @@ The bot stops accepting HTTP work, closes SSE, disposes plugin processes and dis
 
 ## Existing image workflow
 
-The existing manual GitHub workflow builds `linux/arm64,linux/amd64`. Do not run it merely to validate locally. Set `NOX_BOT_IMAGE_TAG` when consuming an existing image; default `pi5` preserves the current deployment tag. The repository/GHCR rename and Discord branding/callback are separate external operations.
+The existing manual GitHub workflow builds `linux/arm64,linux/amd64` for `ghcr.io/mapherez/nox-bot`. Compose and the workflow's image-tag input default to `latest`; set `NOX_BOT_IMAGE_TAG` to select another existing image tag. Image tags are independent of the application's runtime version. Do not run the publishing workflow merely to validate locally. Configure Discord branding and the OAuth callback separately in Developer Portal.

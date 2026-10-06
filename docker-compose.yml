@@ -24,7 +24,7 @@ services:
     stop_grace_period: 30s
 
   state-init:
-    image: ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-pi5}
+    image: ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-latest}
     build: .
     user: "0:0"
     restart: "no"
@@ -43,7 +43,7 @@ services:
     networks: [state]
 
   nox-bot:
-    image: ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-pi5}
+    image: ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-latest}
     build: .
     restart: unless-stopped
     env_file: [.env]

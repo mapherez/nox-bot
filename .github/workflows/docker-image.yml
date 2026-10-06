@@ -6,7 +6,7 @@ on:
       tag:
         description: Docker image tag to publish
         required: true
-        default: pi5
+        default: latest
       push_latest:
         description: Also push the latest tag
         required: true
