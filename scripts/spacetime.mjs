@@ -21,11 +21,25 @@ const args =
         "--lang",
         "typescript",
       ];
+// Linux bind mounts retain host ownership (GitHub runners do not use UID 1000).
+// Keep generated files writable by the caller and CLI configuration outside the checkout.
+const identityArgs =
+  typeof process.getuid === "function" && typeof process.getgid === "function"
+    ? [
+        "--user",
+        `${process.getuid()}:${process.getgid()}`,
+        "--env",
+        "XDG_CONFIG_HOME=/tmp/nox-spacetime/config",
+        "--env",
+        "XDG_DATA_HOME=/tmp/nox-spacetime/data",
+      ]
+    : [];
 const result = spawnSync(
   "docker",
   [
     "run",
     "--rm",
+    ...identityArgs,
     "-v",
     `${root.replaceAll("\\", "/")}:/workspace`,
     "-w",
