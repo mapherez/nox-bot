@@ -1,336 +1,87 @@
-# 🤖 Nox Discord Bot
+# NoX Bot
 
-A modern, modular Discord bot built with **TypeScript** and Discord.js v14, featuring a unified command system with dynamically loaded subcommands and real-time weather integration.
+A multi-server Discord bot with built-in plugins, an owner-only dashboard and realtime configuration stored in self-hosted SpacetimeDB. One Discord client, application and token serve all installed servers.
 
-An optional [control API v1](docs/control-api.md) provides authenticated machine-readable status, guild/channel selection and text-message sending for external clients. It is disabled by default and uses a separate API key. See the API guide for runtime versions and the optional Docker Compose override.
+## Commands
 
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-blue.svg)](https://www.typescriptlang.org/)
-[![Discord.js](https://img.shields.io/badge/Discord.js-v14-blue.svg)](https://discord.js.org/)
-[![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
+| Command | Behaviour |
+| --- | --- |
+| `/weather [location]` | Current conditions, server default location, Celsius/Fahrenheit and private refresh |
+| `/definition <word>` | Portuguese accent correction, Priberam definitions/images and link fallback |
+| `/userinfo [user]` | Discord account and server membership |
+| `/ping` | Interaction latency |
+| `/nox help` | Commands available in this server |
+| `/nox commands` | Private paginated Quick Commands menu; selecting sends a public response |
+| `/nox guildid` | Current server ID |
+| `!trigger` | Public Quick Command response; arguments ignored, case insensitive, input cleanup attempted |
+| `!help` | Enabled Quick Commands from the same registry as the slash menu |
 
-## ✨ Features
+New servers have no enabled plugins or Quick Commands. Configuration is isolated by Discord server ID. Enable plugins and manage Quick Commands in the dashboard; guild slash registrations converge automatically. The bot needs the Message Content intent for Quick Commands and permission to view/send in their channels. Manage Messages allows input cleanup; lack of this permission does not prevent the response.
 
-### 🚀 Core Commands
+## Availability
 
-- **`/nox`** - AI assistant with dynamically loaded subcommands
+The backend subscribes to authenticated SpacetimeDB views and executes only confirmed configuration. On a database interruption, plugins, cached settings/secrets, Quick Commands, interactions, messaging and command reconciliation continue using the last confirmed memory projection. Discord membership and permissions are still checked against the actual Discord client.
 
-#### 🤖 Nox AI Assistant Features
+Persistent mutations and new sessions are unavailable until a complete recovery snapshot and lifecycle/command reconciliation have finished. Writes are never queued or automatically replayed. If confirmation is lost, the outcome is unknown: wait for recovery and inspect confirmed state before trying again. Existing sessions continue within their absolute and inactivity limits. The English dashboard shows stale confirmed data and preserves open drafts. A process without a confirmed snapshot waits for the DB; there is no alternative file storage.
 
-- **Greeting Mode**: `/nox` - Random helpful greetings when no query provided
-- **Weather**: `/nox weather [location]` - Real weather data from OpenWeatherMap API
-- **Dictionary**: `/nox definition [word]` - Portuguese word definitions from Priberam dictionary (displays definition images directly, auto-corrects accents)
-- **Help**: `/nox help` - Interactive help system with all available commands
-- **User Info**: `/nox userinfo [@user]` - Get detailed user information
-- **Server Info**: `/nox guildid` - Get current server/guild ID
-- **Ping Test**: `/nox ping` - Test bot response time
-- **Natural Language**: Fallback processing for unrecognized queries
+`GET /health` on the dashboard listener exposes functional readiness separately from synchronization. After initial startup, a DB interruption alone does not make functional readiness fail. The opt-in Control API retains its existing `/v1` contracts; see [Control API](docs/control-api.md).
 
-### 💬 Prefix Commands
+## Local development
 
-- **Simple ! Commands** - Quick responses stored in JSON configuration
-- **Easy Maintenance** - Add new commands by editing `src/config/prefix-commands.json`
-- **Auto-Cleanup** - Bot automatically deletes command messages to prevent channel spam
-- **Smart Response** - Clean responses without user mentions or pings
-- **Examples**:
-  - `!hello` → "Hey!" (command message deleted)
-  - `!love` → `https://myimageservice.com/image1.png` (command message deleted)
-  - `!test` → "This is a test response!" (command message deleted)
+Use Node 24, Docker and native build tooling for `nodehun` (Python, make, C++ compiler; `libhunspell-dev` on Debian).
 
-### 🏗️ Architecture Highlights
-
-- **Unified Command System** - All features accessible through `/nox` subcommands
-- **Dynamic Subcommand Loading** - Subcommands auto-discovered from filesystem
-- **Service-Oriented Design** - Clean separation of concerns with dedicated services
-- **Development-First Registration** - Commands register instantly in dev guilds (no duplicates)
-- **Modular Architecture** - Easy to extend with new subcommands
-- **Production-Ready** - Comprehensive error handling and graceful shutdown
-
-## 📁 Project Structure
-
-```text
-nox-discord-bot/
-├── 📁 src/
-│   ├── 📁 commands/              # Main command implementations
-│   │   ├── nox.ts               # Unified AI assistant command
-│   │   └── 📁 subcommands/       # Dynamic subcommand modules
-│   │       ├── weather.ts       # Weather subcommand
-│   │       ├── help.ts          # Help subcommand
-│   │       ├── userinfo.ts      # User info subcommand
-│   │       ├── guildid.ts       # Guild ID subcommand
-│   │       ├── ping.ts          # Ping test subcommand
-│   │       ├── definition.ts    # Dictionary subcommand
-│   │       ├── naturallanguage.ts # Natural language fallback
-│   │       └── template.ts.example  # Command template (renamed to prevent loading)
-│   ├── 📁 services/              # Business logic services
-│   │   ├── bot.ts               # Discord client wrapper
-│   │   ├── commandHandler.ts    # Command execution manager
-│   │   └── commandRegistrar.ts  # Command registration service
-│   ├── 📁 utils/                 # Utility functions
-│   │   ├── commandLoader.ts     # Command discovery and loading
-│   │   ├── configLoader.ts      # Configuration management with caching
-│   │   ├── environmentValidator.ts # Environment validation
-│   │   └── logger.ts            # Structured logging with emojis
-│   ├── 📁 config/                # Configuration files
-│   │   ├── client.json          # Client settings and intents
-│   │   ├── prefix-commands.json # Simple ! command responses
-│   │   └── prefix-commands.json.example # Template for prefix commands
-│   └── index.ts                 # Main application entry point
-├── 📄 refresh-commands.ts       # Command registration utility
-├── 📄 package.json              # Dependencies and scripts
-├── 📄 tsconfig.json             # TypeScript configuration
-├── 📄 .env                      # Environment variables (gitignored)
-└── 📄 .github/
-    └── copilot-instructions.md # AI agent development guidelines
+```sh
+npm ci
+npm run typecheck
+npm test
+npm run build:web
+npm run db:build
+npm run db:generate
 ```
 
-## 🚀 Quick Start
+The SpacetimeDB server/CLI and SDK are fixed to **2.10.2**. The image is pinned by multiarchitecture digest in Dockerfile, Compose and `scripts/spacetime.mjs`. Bindings are generated by the official CLI and normalized for Node ESM. Private tables never enter the generated client schema. The TypeScript module is in `spacetimedb/`, browser code in `web/`, browser-safe contracts in `src/shared/`, and backend code in `src/`.
 
-### Prerequisites
+Copy `.env.example` to `.env`, configure the required values and follow [deployment](README-PI5-DOCKER.md). For a local OAuth callback, use an explicitly registered `http://127.0.0.1:3200/auth/callback` and that exact public origin. HTTP is accepted only on localhost. `npm run dev` runs the backend; `npm run dev --workspace web` runs Vite with same-origin API proxies. Set the OAuth public origin to the actual browser origin during Vite development.
 
-- Node.js 18 or higher
-- A Discord application and bot token
-- OpenWeatherMap API key (optional, for weather commands)
+## Owner authentication and secrets
 
-### Installation
+Set `NOX_BOT_OWNER_DISCORD_USER_ID` explicitly. Discord OAuth uses Authorization Code with `identify`; a missing/mismatched owner is denied. No public registration or user-management UI exists. Login state is random, single-use and expires in five minutes. Server-side sessions use hashed opaque identifiers with 24-hour absolute and one-hour inactivity expiry. Session cookies are HttpOnly and SameSite=Lax, and Secure with HTTPS. Mutations, including logout, require the configured Origin and a session CSRF token.
 
-1. **Clone the repository**
+Generate separate 32-byte base64 keys for `NOX_BOT_ENCRYPTION_KEY` and `NOX_BOT_SESSION_SECRET`:
 
-   ```bash
-   git clone https://github.com/mapherez/nox-discord-bot.git
-   cd nox-discord-bot
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   npm install
-   ```
-
-3. **Get API keys**
-
-   - **Discord Bot Token**: Create a bot at [Discord Developer Portal](https://discord.com/developers/applications)
-   - **OpenWeatherMap API Key**: Sign up at [OpenWeatherMap](https://openweathermap.org/api) (free tier available)
-
-4. **Configure environment variables**
-
-   Edit `.env` with your credentials:
-
-   ```env
-   DISCORD_TOKEN=your_bot_token_here
-   CLIENT_ID=your_application_id_here
-   GUILD_ID=your_development_guild_id_here  # Optional, for instant command updates
-   OPENWEATHER_API_KEY=your_weather_api_key_here  # Optional, for weather commands
-   ```
-
-5. **Start the bot**
-
-   ```bash
-   npm start
-   ```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-- `DISCORD_TOKEN` - Your Discord bot token (required)
-- `CLIENT_ID` - Your Discord application ID (required)
-- `GUILD_ID` - Development guild ID for instant command updates (optional)
-- `OPENWEATHER_API_KEY` - OpenWeatherMap API key for weather commands (optional)
-
-### Client Configuration
-
-Edit `src/config/client.json` to configure Discord intents:
-
-```json
-{
-  "intents": ["Guilds", "GuildMessages", "MessageContent"]
-}
+```sh
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-**Note**: The `MessageContent` intent is privileged and requires enabling in your [Discord Developer Portal](https://discord.com/developers/applications) under Bot → Privileged Gateway Intents → Message Content Intent.
+Keep these deployment keys outside the database. Plugin secrets use AES-256-GCM with authenticated server/plugin/field context. Reads and SSE expose only whether a secret is configured; replacement/removal are explicit. Back up the encryption key alongside private deployment credentials: losing it makes saved plugin secrets unreadable. OAuth tokens never enter browser storage. Workers receive no deployment environment secrets.
 
-### OAuth2 Permissions
+## Import existing configuration
 
-When generating your bot's invite URL in Discord Developer Portal → OAuth2 → URL Generator, include these permissions:
+There is no runtime dependency on `prefix-commands.json`, a legacy Weather key or a single `GUILD_ID`. Keep the old JSON only as an import source. Always select a destination server:
 
-- **Scopes**: `bot`
-- **Bot Permissions**:
-  - ✅ Send Messages
-  - ✅ Use Slash Commands
-  - ✅ Read Message History
-  - ✅ Manage Messages (for auto-deleting ! command messages)
-
-**Note**: Server-level permissions may need to be granted in individual channels if they have custom permission overrides.
-
-## 🛠️ Development
-
-### Adding New Subcommands
-
-The bot uses a dynamic subcommand system where all features are accessible through `/nox`. To add a new subcommand:
-
-1. **Create a subcommand file** in `src/commands/subcommands/yourcommand.ts`:
-
-   ```typescript
-   import { ChatInputCommandInteraction } from 'discord.js';
-
-   async function yourcommand(interaction: ChatInputCommandInteraction, params: string): Promise<void> {
-     // Your subcommand logic here
-     // params contains any additional arguments from Discord options
-     await interaction.reply('Your command response!');
-   }
-
-   export { yourcommand };
-   ```
-
-2. **Add options to nox.ts** (if needed) in the `buildCommandWithSubcommands()` function:
-
-   ```typescript
-   if (subcommandName === 'yourcommand') {
-     command.addSubcommand(subcommand =>
-       subcommand
-         .setName('yourcommand')
-         .setDescription('Description of your command')
-         .addStringOption(option =>
-           option.setName('param')
-             .setDescription('Parameter description')
-             .setRequired(false)
-         )
-     );
-   }
-   ```
-
-3. **Restart the bot** - subcommands are automatically discovered and registered
-
-### Adding Standalone Commands
-
-For commands that don't fit the `/nox` subcommand pattern:
-
-1. **Create a command file** in the `src/commands/` directory:
-
-   ```typescript
-   import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
-
-   export default {
-     data: new SlashCommandBuilder()
-       .setName('yourcommand')
-       .setDescription('Command description'),
-
-     execute: async (interaction: ChatInputCommandInteraction) => {
-       await interaction.reply('Hello World!');
-     }
-   };
-   ```
-
-2. **Restart the bot** - commands are automatically discovered
-
-### Adding Prefix Commands
-
-For simple `!` commands that return predefined responses:
-
-1. **Copy the template**:
-
-   ```bash
-   cp src/config/prefix-commands.json.example src/config/prefix-commands.json
-   ```
-
-2. **Edit `src/config/prefix-commands.json`** with your custom commands:
-
-   ```json
-   {
-     "hello": "Hey there!",
-     "love": "https://myimageservice.com/image1.png",
-     "meme": "Check out this funny meme!",
-     "yourcommand": "Your custom response here"
-   }
-   ```
-
-3. **Restart the bot** - prefix commands are automatically loaded
-
-**Note**: Your `prefix-commands.json` file is gitignored to keep your custom commands private.
-
-### Development Features
-
-- **Instant Command Updates** - Set `GUILD_ID` in `.env` for immediate command registration in dev guild only
-- **No Duplicate Registration** - Development mode skips global registration to prevent duplicates
-- **Dynamic Subcommand Loading** - New subcommands appear automatically without code changes
-- **Configuration Caching** - JSON configs loaded with caching for improved performance
-- **Comprehensive Logging** - Structured logging with emoji prefixes
-- **Error Handling** - Graceful error handling with user-friendly messages
-
-### Command Registration Workflow
-
-The `npm run refresh` command uses `refresh-commands.ts` to:
-
-1. Clear all existing slash commands
-2. Wait 2 seconds for Discord to process
-3. Register all newly discovered commands
-4. Provide instant feedback on success/failure
-
-**Tip**: Use `GUILD_ID` in `.env` for development to avoid global command registration delays.
-
-### Available Scripts
-
-```bash
-npm start      # Start the bot in development mode (with ts-node/esm)
-npm run dev    # Start the bot in watch mode for development (auto-restart on changes)
-npm run build  # Compile TypeScript to JavaScript (outputs to dist/)
-npm run prod   # Build and run the production version
-npm run refresh # Refresh Discord slash commands (clears existing, registers new)
-npm run typecheck # Check TypeScript without emitting files
-npm test       # Build and run offline API, Discord service and regression tests
+```sh
+npm run build
+node scripts/import-legacy.mjs --guild DISCORD_SERVER_ID --commands /path/to/prefix-commands.json --dry-run
+node scripts/import-legacy.mjs --guild DISCORD_SERVER_ID --commands /path/to/prefix-commands.json
 ```
 
-## 🤝 Contributing
+Optionally add `--weather-key-env OPENWEATHER_API_KEY` to import the old key from the explicitly named environment variable. The importer never prints that key. It enables Dictionary, User Info and Ping, and Weather when a key is provided; otherwise Weather stays pending with London/Celsius defaults. It refuses to overwrite existing records and writes an idempotency marker atomically. Dry run validates the input without connecting to Discord/DB or changing state; the actual import checks bot installation in Discord and needs the configured DB service credentials and encryption key.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Built-in plugins
 
-### Development Guidelines
+Each plugin owns a typed runtime and lazy React dashboard entry. Register metadata, version, icon, capabilities, settings/secret validators, complete commands and handlers in `src/plugins/catalog.ts`. The Core discovers help, dashboard cards and registrations from that catalog. Runtime metadata/handlers are validated before commands become available. Plugins run in separate Node processes, one per plugin shared between enabled servers; the first enable starts it and the last confirmed disable disposes/terminates it. Native `nodehun` is isolated in Dictionary's process.
 
-- Follow the existing code structure and naming conventions
-- Add appropriate error handling and logging
-- Test commands in a development environment before submitting
-- Update documentation for new features
+A crash rejects pending operations and allows recovery after 1, 2 and 4 seconds using confirmed configuration, even while the DB is disconnected. Persistent failure is visible; confirmed disable/enable resets recovery. Removing a server excludes it from runtime without deleting its saved configuration. All plugin responses and errors are private. Component IDs are opaque and tied to owner, server, plugin and expiry; disabled/expired components are refused.
 
-## 📋 Requirements
+## Validation and external setup
 
-- **Node.js**: 18.0.0 or higher
-- **TypeScript**: 5.9.0 or higher
-- **Discord.js**: v14.22.1
-- **OpenWeatherMap API Key**: For weather commands (optional)
-- **Permissions**: Bot needs appropriate Discord permissions based on commands used
+The suite uses Discord/OAuth fakes and includes an opt-in self-hosted DB integration test. See [validation](docs/validation.md) for executed checks and live acceptance steps. Fakes cannot establish real OAuth callback or Discord registration state.
 
-## 📦 Dependencies
+External changes to perform separately:
 
-- **discord.js v14** - Core Discord bot framework
-- **TypeScript** - Type-safe JavaScript
-- **dotenv** - Environment variable management
-- **axios** - HTTP client for API requests (weather data)
-- **cheerio** - HTML parsing for web scraping
-- **nodehun** - Spell checking library for Portuguese dictionary support
+- Rename the GitHub repository to `nox-bot`, then update local remotes and repository links.
+- Update the existing GHCR image path and deployment configuration after the repository rename.
+- Change the Discord application/bot branding to **NoX Bot** in Developer Portal.
+- Register the exact HTTPS `/auth/callback` URL and provide the OAuth client secret/owner ID.
 
-### Development Dependencies
-
-- **ts-node** - TypeScript execution in Node.js with ESM support
-- **@types/node** - TypeScript definitions for Node.js
-
-## 📄 License
-
-This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Built with [Discord.js](https://discord.js.org/) - The most popular Discord library for Node.js
-- Weather data provided by [OpenWeatherMap](https://openweathermap.org/) API
-- Inspired by modern Discord bot development practices
-- Thanks to the Discord developer community
-
----
-
-## Made with ❤️ for the Discord community
-
-*Have questions or need help? Feel free to open an issue or join our Discord server!*
+The existing workflow supports ARM64 and AMD64; implementation does not execute that publishing workflow, publish images, create tags/releases or change remote resources. MCP, LLMs, marketplace, external plugins, multiple tokens, billing and public registration are outside scope.

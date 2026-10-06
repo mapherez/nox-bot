@@ -13,3 +13,9 @@ yarn-error.log*
 # Keep private prefix commands out of the baked image.
 src/config/prefix-commands.json
 prefix-commands.json
+
+.tmp
+.playwright-cli
+output
+web/dist
+spacetimedb/dist

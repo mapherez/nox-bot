@@ -2,7 +2,7 @@ import Logger from "./logger.js";
 
 class EnvironmentValidator {
   static validate(env: NodeJS.ProcessEnv = process.env) {
-    const required = ["DISCORD_TOKEN", "CLIENT_ID"];
+    const required = ["DISCORD_TOKEN", "DISCORD_CLIENT_ID"];
 
     const missing = required.filter((key) => !env[key]);
 
@@ -28,9 +28,9 @@ class EnvironmentValidator {
     }
 
     // Validate client ID format (should be numeric)
-    if (!env.CLIENT_ID || !/^\d+$/.test(env.CLIENT_ID)) {
+    if (!env.DISCORD_CLIENT_ID || !/^\d+$/.test(env.DISCORD_CLIENT_ID)) {
       Logger.warn(
-        "CLIENT_ID appears to be invalid. It should be a numeric ID."
+        "DISCORD_CLIENT_ID appears to be invalid. It should be a numeric ID."
       );
     }
 

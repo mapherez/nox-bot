@@ -1,12 +1,72 @@
 services:
-  nox-discord-bot:
-    image: ghcr.io/mapherez/nox-discord-bot:pi5
-    container_name: nox-discord-bot
-    restart: unless-stopped
-
-    env_file:
-      - .env
-
+  state-volume-init:
+    image: clockworklabs/spacetime@sha256:acf3210403559f731e222fb77042aac32429d7ea77a4858ffa68bd459383069d
+    user: "0:0"
+    restart: "no"
+    entrypoint: ["sh", "-c"]
+    command: ["chown 1000:1000 /state/data /state/signing && chmod 700 /state/data /state/signing"]
     volumes:
-      # Put your generated prefix-commands.json next to this compose file on the Pi.
-      - ./prefix-commands.json:/app/dist/config/prefix-commands.json:ro
+      - spacetime-data:/state/data
+      - spacetime-signing:/state/signing
+    networks: [state]
+
+  spacetimedb:
+    image: clockworklabs/spacetime@sha256:acf3210403559f731e222fb77042aac32429d7ea77a4858ffa68bd459383069d
+    restart: unless-stopped
+    depends_on:
+      state-volume-init:
+        condition: service_completed_successfully
+    command: ["start", "--data-dir", "/home/spacetime/.local/share/spacetime/data", "--non-interactive"]
+    volumes:
+      - spacetime-data:/home/spacetime/.local/share/spacetime/data
+      - spacetime-signing:/home/spacetime/.config/spacetime
+    networks: [state]
+    stop_grace_period: 30s
+
+  state-init:
+    image: ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-pi5}
+    build: .
+    user: "0:0"
+    restart: "no"
+    command: ["node", "scripts/provision-state.mjs"]
+    depends_on:
+      spacetimedb:
+        condition: service_started
+    environment:
+      NOX_BOT_SPACETIMEDB_URL: http://spacetimedb:3000
+      NOX_BOT_SPACETIMEDB_DATABASE: nox-bot
+      NOX_BOT_STATE_CREDENTIAL_FILE: /run/nox-bot/publisher/credentials.json
+      NOX_BOT_SERVICE_CREDENTIAL_FILE: /run/nox-bot/service/credentials.json
+    volumes:
+      - state-publisher:/run/nox-bot/publisher
+      - state-service:/run/nox-bot/service
+    networks: [state]
+
+  nox-bot:
+    image: ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-pi5}
+    build: .
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      NOX_BOT_SPACETIMEDB_URL: http://spacetimedb:3000
+      NOX_BOT_SPACETIMEDB_DATABASE: nox-bot
+      NOX_BOT_STATE_CREDENTIAL_FILE: /run/nox-bot/service/credentials.json
+      NOX_BOT_DASHBOARD_HOST: 0.0.0.0
+      NOX_BOT_DASHBOARD_PORT: "3200"
+    volumes:
+      - state-service:/run/nox-bot/service:ro
+    ports: ["127.0.0.1:${NOX_BOT_DASHBOARD_PORT:-3200}:3200"]
+    depends_on:
+      state-init:
+        condition: service_completed_successfully
+    networks: [default, state]
+    stop_grace_period: 15s
+
+networks:
+  state:
+    internal: true
+volumes:
+  spacetime-data:
+  spacetime-signing:
+  state-publisher:
+  state-service:

@@ -1,0 +1,8 @@
+{
+  "name": "nox-bot-state",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "dependencies": { "spacetimedb": "2.10.2" }
+}

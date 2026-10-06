@@ -12,7 +12,7 @@ quietLogger();
 async function fixture(t, overrides = {}) {
   const state = { value: "running" };
   const operations = { ...fakeOperations(), ...overrides };
-  const api = new ControlApi({ enabled: true, host: "127.0.0.1", port: 0, key }, operations, createServiceInfo("v2.3.4"), () => state.value);
+  const api = new ControlApi({ enabled: true, host: "127.0.0.1", port: 0, key }, operations, createServiceInfo("v1.9.4"), () => state.value);
   await api.start();
   t.after(() => api.stop());
   const base = `http://127.0.0.1:${api.address().port}`;
@@ -32,10 +32,10 @@ test("public metadata contracts and readiness track startup, connection and shut
   const f = await fixture(t);
   const info = await f.call("/v1/info", { headers: { Authorization: "invalid" } });
   assert.equal(info.status, 200);
-  assert.deepEqual(info.body, { service: "nox-discord-bot", version: "v2.3.4", apiVersion: "v1", capabilities: ["discord-status", "guilds", "channels", "messages"] });
+  assert.deepEqual(info.body, { service: "nox-bot", version: "v1.9.4", apiVersion: "v1", capabilities: ["discord-status", "guilds", "channels", "messages"] });
   const health = await f.call("/v1/health", { headers: { Authorization: "" } });
   assert.equal(health.status, 200);
-  assert.deepEqual(health.body, { service: "nox-discord-bot", version: info.body.version, apiVersion: "v1", ready: true, process: { state: "running" }, discord: { state: "connected", ready: true } });
+  assert.deepEqual(health.body, { service: "nox-bot", version: info.body.version, apiVersion: "v1", ready: true, process: { state: "running" }, discord: { state: "connected", ready: true } });
   assert.equal(health.headers.get("content-type"), "application/json; charset=utf-8");
   assert.equal(health.headers.get("cache-control"), "no-store");
   f.state.value = "starting";
@@ -118,7 +118,7 @@ test("payload validation rejects whitespace, wrong fields, IDs, JSON and body si
 
 test("route and method errors use the contract", async (t) => {
   const f = await fixture(t);
-  assert.equal((await f.call("/v2/info")).body.code, "ROUTE_NOT_FOUND");
+  assert.equal((await f.call("/unknown/info")).body.code, "ROUTE_NOT_FOUND");
   const wrong = await f.call("/v1/messages");
   assert.equal(wrong.status, 405);
   assert.equal(wrong.headers.get("allow"), "POST");

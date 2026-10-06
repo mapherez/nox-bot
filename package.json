@@ -1,31 +1,44 @@
 {
-  "name": "nox-discord-bot",
+  "name": "nox-bot",
   "version": "1.0.0",
-  "description": "",
+  "description": "NoX Bot — multi-guild Discord bot with built-in plugins and a realtime dashboard",
   "type": "module",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "web",
+    "spacetimedb"
+  ],
   "scripts": {
     "start": "node --loader ts-node/esm src/index.ts",
     "dev": "node --loader ts-node/esm --watch src/index.ts",
-    "build": "tsc && node scripts/copy-runtime-files.mjs",
-    "copy:assets": "node scripts/copy-runtime-files.mjs",
-    "refresh": "node --loader ts-node/esm refresh-commands.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test tests/*.test.mjs"
+    "build": "node scripts/clean-build.mjs && tsc && node scripts/copy-runtime-files.mjs && node scripts/verify-catalog.mjs",
+    "copy:assets": "node scripts/copy-runtime-files.mjs && node scripts/verify-catalog.mjs",
+    "typecheck": "tsc --noEmit && npm run typecheck --workspaces",
+    "build:web": "npm run build --workspace web",
+    "db:generate": "node scripts/spacetime.mjs generate",
+    "db:build": "node scripts/spacetime.mjs build",
+    "test:state": "npm run build && npm run db:build && node scripts/test-state.mjs",
+    "test": "npm run build && npm run build:web && node --test tests/*.test.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.12.2",
     "cheerio": "^1.0.0-rc.12",
     "discord.js": "^14.22.1",
     "dotenv": "^17.2.3",
-    "nodehun": "^3.0.2"
+    "nodehun": "^3.0.2",
+    "spacetimedb": "2.10.2"
   },
   "devDependencies": {
     "@types/node": "^24.6.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "nodehun@3.0.2": true
   }
 }

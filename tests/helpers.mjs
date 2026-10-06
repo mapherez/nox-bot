@@ -2,14 +2,13 @@ import { setTimeout as delay } from "node:timers/promises";
 import { mock } from "node:test";
 import Logger from "../dist/utils/logger.js";
 
-// Node 22's process-isolated runner can corrupt its IPC stream when ordinary stdout
-// contains multibyte logging. Keep routine application logs out of the test runner.
+// Keep routine application logs out of the process-isolated test runner.
 export function quietLogger() {
   for (const method of ["info", "success", "warn", "error", "debug"]) mock.method(Logger, method, () => {});
 }
 
 export const key = "control-api-test-key-distinct-from-discord";
-export const env = { DISCORD_TOKEN: `MT${"x".repeat(60)}`, CLIENT_ID: "123456789", NOX_DISCORD_API_ENABLED: "false" };
+export const env = { DISCORD_TOKEN: `MT${"x".repeat(60)}`, DISCORD_CLIENT_ID: "123456789", NOX_BOT_API_ENABLED: "false" };
 export function deferred() {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });

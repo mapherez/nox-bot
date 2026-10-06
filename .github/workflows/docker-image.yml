@@ -27,7 +27,7 @@ jobs:
 
   build:
     needs: tests
-    name: Build and push ARM64 image
+    name: Build and push multiarch image
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +38,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Resolve application version from published commit
         id: version
@@ -71,9 +71,9 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/arm64
+          platforms: linux/arm64,linux/amd64
           build-args: |
-            NOX_DISCORD_BUILD_VERSION=${{ steps.version.outputs.version }}
+            NOX_BOT_BUILD_VERSION=${{ steps.version.outputs.version }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

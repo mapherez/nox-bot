@@ -5,7 +5,7 @@ export async function resolveRuntimeVersion(
   env: NodeJS.ProcessEnv = process.env,
   buildInfoUrl: URL = new URL("../build-info.json", import.meta.url),
 ): Promise<string> {
-  const explicit = env.NOX_DISCORD_VERSION?.trim();
+  const explicit = env.NOX_BOT_VERSION?.trim();
   if (explicit) return explicit;
   try {
     const info: unknown = JSON.parse(await readFile(buildInfoUrl, "utf8"));
@@ -20,7 +20,7 @@ export async function resolveRuntimeVersion(
 
 export function createServiceInfo(version: string): ServiceInfo {
   return Object.freeze({
-    service: "nox-discord-bot", version, apiVersion: "v1",
+    service: "nox-bot", version, apiVersion: "v1",
     capabilities: Object.freeze(["discord-status", "guilds", "channels", "messages"]),
   });
 }

@@ -15,10 +15,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - name: Install native build tooling
         run: sudo apt-get update && sudo apt-get install -y python3 make g++ pkg-config libhunspell-dev
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: npm run test:state

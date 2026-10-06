@@ -17,7 +17,7 @@ export interface DiscordOperationsContract {
   sendMessage(channelId: string, content: string): Promise<CreatedMessage>;
 }
 export interface ServiceInfo {
-  service: "nox-discord-bot";
+  service: "nox-bot";
   version: string;
   apiVersion: "v1";
   capabilities: readonly string[];
@@ -51,24 +51,24 @@ export function normalizedDiscordToken(token: string): string {
 }
 
 export function loadControlApiConfig(env: NodeJS.ProcessEnv): ControlApiConfig {
-  const enabled = env.NOX_DISCORD_API_ENABLED ?? "false";
+  const enabled = env.NOX_BOT_API_ENABLED ?? "false";
   if (enabled !== "true" && enabled !== "false") {
-    throw new Error("NOX_DISCORD_API_ENABLED must be true or false.");
+    throw new Error("NOX_BOT_API_ENABLED must be true or false.");
   }
   if (enabled === "false") return { enabled: false, host: "127.0.0.1", port: 3100 };
-  const host = env.NOX_DISCORD_API_HOST ?? "127.0.0.1";
+  const host = env.NOX_BOT_API_HOST ?? "127.0.0.1";
   if (!isIP(host) && host !== "localhost") {
-    throw new Error("NOX_DISCORD_API_HOST must be an IP address or localhost.");
+    throw new Error("NOX_BOT_API_HOST must be an IP address or localhost.");
   }
-  const portText = env.NOX_DISCORD_API_PORT ?? "3100";
+  const portText = env.NOX_BOT_API_PORT ?? "3100";
   const port = Number(portText);
   if (!/^\d+$/.test(portText) || !Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error("NOX_DISCORD_API_PORT must be between 1 and 65535.");
+    throw new Error("NOX_BOT_API_PORT must be between 1 and 65535.");
   }
-  const key = env.NOX_DISCORD_API_KEY;
-  if (!key || /\s/.test(key)) throw new Error("NOX_DISCORD_API_KEY is required and must not contain whitespace.");
+  const key = env.NOX_BOT_API_KEY;
+  if (!key || /\s/.test(key)) throw new Error("NOX_BOT_API_KEY is required and must not contain whitespace.");
   if (env.DISCORD_TOKEN && normalizedDiscordToken(key) === normalizedDiscordToken(env.DISCORD_TOKEN)) {
-    throw new Error("NOX_DISCORD_API_KEY must differ from DISCORD_TOKEN.");
+    throw new Error("NOX_BOT_API_KEY must differ from DISCORD_TOKEN.");
   }
   return { enabled: true, host, port, key };
 }

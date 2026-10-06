@@ -1,7 +1,9 @@
 ﻿import { normalizedDiscordToken } from "../controlApi.js";
 
+const registeredSecrets = new Set<string>();
+export function registerSecret(value: string): void { if (value) registeredSecrets.add(value); }
 function redact(value: string): string {
-  const secrets = [process.env.DISCORD_TOKEN, process.env.NOX_DISCORD_API_KEY];
+  const secrets = [...registeredSecrets, process.env.DISCORD_TOKEN, process.env.NOX_BOT_API_KEY, process.env.DISCORD_CLIENT_SECRET, process.env.NOX_BOT_SPACETIMEDB_TOKEN, process.env.NOX_BOT_SESSION_SECRET, process.env.NOX_BOT_ENCRYPTION_KEY];
   if (process.env.DISCORD_TOKEN) secrets.push(normalizedDiscordToken(process.env.DISCORD_TOKEN));
   for (const secret of secrets.filter((item): item is string => !!item).sort((a, b) => b.length - a.length)) {
     value = value.split(secret).join("[REDACTED]");

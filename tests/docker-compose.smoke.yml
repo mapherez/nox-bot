@@ -1,8 +1,8 @@
-# Offline lifecycle smoke test; never reads the deployment .env or logs into Discord.
+# Offline lifecycle smoke only. No deployment .env, actual login or publishing.
 services:
   shutdown:
-    image: nox-discord-bot:control-api-smoke
-    platform: linux/arm64
+    image: ${NOX_BOT_TEST_IMAGE:-nox-bot:validation-arm64}
+    platform: ${NOX_BOT_TEST_PLATFORM:-linux/arm64}
     entrypoint: ["node", "/app/tests/fixtures/docker-shutdown.mjs"]
     volumes:
       - type: bind

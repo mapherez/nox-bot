@@ -1,9 +1,9 @@
 services:
-  nox-discord-bot:
+  nox-bot:
     environment:
-      NOX_DISCORD_API_ENABLED: "true"
-      NOX_DISCORD_API_HOST: "0.0.0.0"
-      NOX_DISCORD_API_PORT: "${NOX_DISCORD_API_PORT:-3100}"
+      NOX_BOT_API_ENABLED: "true"
+      NOX_BOT_API_HOST: "0.0.0.0"
+      NOX_BOT_API_PORT: "${NOX_BOT_API_PORT:-3100}"
     ports:
-      - "127.0.0.1:${NOX_DISCORD_API_PORT:-3100}:${NOX_DISCORD_API_PORT:-3100}"
+      - "127.0.0.1:${NOX_BOT_API_PORT:-3100}:${NOX_BOT_API_PORT:-3100}"
     stop_grace_period: 15s

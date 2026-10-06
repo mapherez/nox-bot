@@ -101,3 +101,11 @@ Thumbs.db
 
 # Project specific
 # Add any project-specific files you want to ignore
+# NoX Bot local verification artifacts
+.tmp/
+spacetimedb/dist/
+
+.playwright-cli/
+output/
+!web/public/
+!web/public/nox.svg

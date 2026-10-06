@@ -1,179 +1,98 @@
 import { Client, GatewayIntentBits, type ClientEvents } from "discord.js";
+import type { InteractionRouter } from "./interactionRouter.js";
+import type { QuickCommandService } from "../core/quickCommands.js";
+import type { MessagingService } from "../core/messaging.js";
 import Logger from "../utils/logger.js";
-import {
-  loadPrefixCommands as loadPrefixCommandsFromFile,
-  getPrefixCommandResponse,
-} from "../utils/prefixCommands.js";
-import { buildPrefixCommandsPage } from "../utils/prefixCommandMenu.js";
 
-class Bot {
-  client: Client;
-  commandHandler: any;
-  prefixCommands: Record<string, string>;
-  private readonly eventHandlers: Array<{ event: string; listener: (...args: any[]) => void }> = [];
+export default class Bot {
+  readonly client: Client;
+  private router?: InteractionRouter;
+  private quick?: QuickCommandService;
+  private messaging?: MessagingService;
+  private handlers: Array<() => void> = [];
   private destruction?: Promise<void>;
-
-  constructor(intents: GatewayIntentBits[]) {
+  constructor(
+    intents = [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+    ],
+  ) {
     this.client = new Client({ intents });
-    this.commandHandler = null;
-    this.prefixCommands = this.loadPrefixCommands();
-    this.setupEventHandlers();
-  }
-
-  loadPrefixCommands(): Record<string, string> {
-    return loadPrefixCommandsFromFile();
-  }
-
-  setCommandHandler(commandHandler: any): void {
-    this.commandHandler = commandHandler;
-  }
-
-  setupEventHandlers() {
-    const once = <K extends keyof ClientEvents>(event: K, listener: (...args: ClientEvents[K]) => void) => {
-      this.eventHandlers.push({ event, listener });
-      this.client.once(event, listener);
-    };
-    const on = <K extends keyof ClientEvents>(event: K, listener: (...args: ClientEvents[K]) => void) => {
-      this.eventHandlers.push({ event, listener });
-      this.client.on(event, listener);
-    };
-    once("clientReady", () => {
-      Logger.success(`Bot online as ${this.client.user?.tag}`);
+    this.on("clientReady", () =>
+      Logger.success(`NoX Bot online as ${this.client.user?.tag}`),
+    );
+    this.on("error", () => Logger.error("Discord client error."));
+    this.on("warn", () => Logger.warn("Discord client warning."));
+    this.on("interactionCreate", (interaction) => {
+      void this.router?.handle(interaction);
     });
-
-    on("interactionCreate", async (interaction) => {
-      if (interaction.isButton()) {
-        const customId = interaction.customId;
-
-        if (customId.startsWith("prefix:page:")) {
-          const page = Number(customId.replace("prefix:page:", ""));
-
-          if (Number.isNaN(page)) {
-            await interaction.reply({
-              content: "Invalid command page.",
-              ephemeral: true,
-            });
-            return;
-          }
-
-          await interaction.update(buildPrefixCommandsPage(page));
-          return;
+    this.on("messageCreate", (message) => {
+      if (
+        message.author.bot ||
+        !message.guildId ||
+        !message.content.startsWith("!") ||
+        !this.quick ||
+        !this.messaging
+      )
+        return;
+      const trigger = message.content.slice(1).split(/\s/, 1)[0].toLowerCase();
+      const response =
+        trigger === "help"
+          ? this.quick
+              .list(message.guildId, true)
+              .map((command) => `!${command.data.trigger}`)
+              .join(", ") || "No Quick Commands are enabled in this server."
+          : this.quick.response(message.guildId, trigger);
+      if (!response) return;
+      void (async () => {
+        try {
+          await message.delete();
+        } catch {
+          Logger.warn("Quick Command input could not be deleted.");
         }
-
-        if (customId.startsWith("prefix:cmd:")) {
-          const command = customId.replace("prefix:cmd:", "");
-          const response = getPrefixCommandResponse(command);
-
-          if (!response) {
-            await interaction.reply({
-              content: `Command "!${command}" no longer exists.`,
-              ephemeral: true,
-            });
-            return;
-          }
-
-          await interaction.reply(response);
-          return;
-        }
-      }
-
-      if (this.commandHandler) {
-        await this.commandHandler.handleInteraction(interaction);
-      }
-    });
-
-    on("messageCreate", async (message) => {
-      if (message.author.bot) return; // Ignore bot messages
-
-      if (message.content.startsWith("!")) {
-        const command = message.content.slice(1).split(" ")[0].toLowerCase();
-
-        if (command === "help") {
-          const commands = Object.keys(this.prefixCommands)
-            .sort()
-            .map((name) => `!${name}`);
-
-          const response =
-            commands.length > 0
-              ? `Available commands:\n${commands.join(", ")}`
-              : "No prefix commands available.";
-
-          try {
-            await message.delete();
-          } catch (error) {
-            Logger.warn(
-              "Could not delete command message:",
-              (error as Error).message,
+        try {
+          for (let offset = 0; offset < response.length; offset += 2000)
+            await this.messaging!.send(
+              {
+                provider: "discord",
+                kind: "guild-channel",
+                guildId: message.guildId!,
+                channelId: message.channelId,
+              },
+              { content: response.slice(offset, offset + 2000) },
             );
-          }
-
-          try {
-            await message.channel.send(response);
-          } catch (error) {
-            Logger.error(
-              "Could not send help message:",
-              (error as Error).message,
-            );
-          }
-
-          return;
+        } catch {
+          Logger.error("Quick Command response could not be sent.");
         }
-
-        const response = this.prefixCommands[command];
-        if (response) {
-          // Delete the original command message first to prevent spam
-          try {
-            await message.delete();
-          } catch (error) {
-            Logger.warn(
-              "Could not delete command message:",
-              (error as Error).message,
-            );
-          }
-
-          // Send response as regular message (not reply) since original is deleted
-          try {
-            await message.channel.send(response);
-          } catch (error) {
-            Logger.error("Could not send response:", (error as Error).message);
-          }
-        }
-      }
-    });
-
-    on("error", (error) => {
-      Logger.error("Client error:", error);
-    });
-
-    on("warn", (warning) => {
-      Logger.warn("Client warning:", warning);
+      })();
     });
   }
-
-  async login(token: string): Promise<boolean> {
-    try {
-      await this.client.login(token);
-      return true;
-    } catch (error) {
-      Logger.error("Failed to login:", error);
-      throw error;
-    }
+  attach(
+    router: InteractionRouter,
+    quick: QuickCommandService,
+    messaging: MessagingService,
+  ): void {
+    this.router = router;
+    this.quick = quick;
+    this.messaging = messaging;
   }
-
+  on<K extends keyof ClientEvents>(
+    event: K,
+    handler: (...args: ClientEvents[K]) => void,
+  ): void {
+    this.client.on(event, handler);
+    this.handlers.push(() => this.client.off(event, handler));
+  }
+  async login(token: string): Promise<void> {
+    await this.client.login(token);
+  }
   destroy(): Promise<void> {
-    if (!this.destruction) this.destruction = this.destroyClient();
-    return this.destruction;
-  }
-
-  private async destroyClient(): Promise<void> {
-    Logger.info("Shutting down bot...");
-    try { await this.client.destroy(); }
-    finally {
-      for (const { event, listener } of this.eventHandlers) this.client.off(event, listener);
-      this.eventHandlers.length = 0;
-    }
-    Logger.success("Bot shut down successfully");
+    return (this.destruction ??= (async () => {
+      this.router?.close();
+      await this.client.destroy();
+      this.handlers.forEach((remove) => remove());
+      this.handlers = [];
+    })());
   }
 }
-
-export default Bot;

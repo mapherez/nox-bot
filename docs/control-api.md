@@ -1,4 +1,4 @@
-# NoX Discord control API v1
+# NoX Bot control API v1
 
 The control API is an optional machine-readable interface for external clients, including a future NoX CLI. It runs inside the bot process and uses its existing Discord Client. Slash commands, prefix commands and registration keep their existing behavior.
 
@@ -6,13 +6,13 @@ The control API is an optional machine-readable interface for external clients, 
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `NOX_DISCORD_API_ENABLED` | `false` | Exactly `true` enables HTTP. A key alone does not enable it. |
-| `NOX_DISCORD_API_HOST` | `127.0.0.1` | Bind IP address or `localhost`; IPv6 is supported. |
-| `NOX_DISCORD_API_PORT` | `3100` | Port from 1 to 65535. |
-| `NOX_DISCORD_API_KEY` | unset | Required when enabled; no whitespace; must differ from the Discord token, including its normalized form. |
-| `NOX_DISCORD_VERSION` | unset | Optional runtime application-version override. |
+| `NOX_BOT_API_ENABLED` | `false` | Exactly `true` enables HTTP. A key alone does not enable it. |
+| `NOX_BOT_API_HOST` | `127.0.0.1` | Bind IP address or `localhost`; IPv6 is supported. |
+| `NOX_BOT_API_PORT` | `3100` | Port from 1 to 65535. |
+| `NOX_BOT_API_KEY` | unset | Required when enabled; no whitespace; must differ from the Discord token, including its normalized form. |
+| `NOX_BOT_VERSION` | unset | Optional runtime application-version override. |
 
-Existing variables (`DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, `OPENWEATHER_API_KEY`) retain their roles. `npm run refresh` does not start HTTP or require API configuration.
+Discord uses `DISCORD_TOKEN` and `DISCORD_CLIENT_ID`. Guild selection comes from the real client; plugin settings and secrets are stored per guild in SpacetimeDB. The Control API does not read the legacy Weather key or command JSON.
 
 Generate a separate random key:
 
@@ -23,10 +23,10 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 Store it in your private `.env`; do not reuse `DISCORD_TOKEN`. With HTTP enabled, invalid configuration or a failed bind prevents startup and triggers cleanup. Without HTTP enabled, no listener is created and no key is required.
 
 ```dotenv
-NOX_DISCORD_API_ENABLED=true
-NOX_DISCORD_API_HOST=127.0.0.1
-NOX_DISCORD_API_PORT=3100
-NOX_DISCORD_API_KEY=<your-separate-random-key>
+NOX_BOT_API_ENABLED=true
+NOX_BOT_API_HOST=127.0.0.1
+NOX_BOT_API_PORT=3100
+NOX_BOT_API_KEY=<your-separate-random-key>
 ```
 
 ## Authentication and access
@@ -49,7 +49,7 @@ All application responses use JSON (`application/json; charset=utf-8`) and `Cach
 
 ```json
 {
-  "service": "nox-discord-bot",
+  "service": "nox-bot",
   "version": "v1.2.3",
   "apiVersion": "v1",
   "ready": true,
@@ -68,7 +68,7 @@ Always returns 200 while HTTP is serving, independently of Discord readiness:
 
 ```json
 {
-  "service": "nox-discord-bot",
+  "service": "nox-bot",
   "version": "v1.2.3",
   "apiVersion": "v1",
   "capabilities": ["discord-status", "guilds", "channels", "messages"]
@@ -95,7 +95,7 @@ Returns 200 even during a Discord disconnect:
 { "guilds": [{ "id": "123456789", "name": "My server" }] }
 ```
 
-Returns 200, listing only ID/name from the bot's guild cache. Requires initialization and Discord readiness. Ordered by ID, without pagination. `GUILD_ID` controls development command registration, not API guild selection.
+Returns 200, listing only ID/name from the bot's guild cache. Requires initialization and Discord readiness. Ordered by ID, without pagination. Guild commands are reconciled automatically for each installed server.
 
 ### GET /v1/guilds/:guildId/channels — authenticated
 
@@ -154,15 +154,15 @@ Protected routes authenticate before parsing bodies or accessing Discord. Discor
 
 ## Examples
 
-Set `NOX_DISCORD_API_KEY` in your shell for authenticated examples:
+Set `NOX_BOT_API_KEY` in your shell for authenticated examples:
 
 ```sh
 curl http://127.0.0.1:3100/v1/health
 curl http://127.0.0.1:3100/v1/info
-curl -H "Authorization: Bearer $NOX_DISCORD_API_KEY" http://127.0.0.1:3100/v1/status
-curl -H "Authorization: Bearer $NOX_DISCORD_API_KEY" http://127.0.0.1:3100/v1/guilds
-curl -H "Authorization: Bearer $NOX_DISCORD_API_KEY" http://127.0.0.1:3100/v1/guilds/123456789/channels
-curl -X POST -H "Authorization: Bearer $NOX_DISCORD_API_KEY" \
+curl -H "Authorization: Bearer $NOX_BOT_API_KEY" http://127.0.0.1:3100/v1/status
+curl -H "Authorization: Bearer $NOX_BOT_API_KEY" http://127.0.0.1:3100/v1/guilds
+curl -H "Authorization: Bearer $NOX_BOT_API_KEY" http://127.0.0.1:3100/v1/guilds/123456789/channels
+curl -X POST -H "Authorization: Bearer $NOX_BOT_API_KEY" \
   -H "Content-Type: application/json" \
   --data '{"channelId":"987654321","content":"test message"}' \
   http://127.0.0.1:3100/v1/messages
@@ -170,9 +170,9 @@ curl -X POST -H "Authorization: Bearer $NOX_DISCORD_API_KEY" \
 
 ## Versions and Docker
 
-The application resolves one version at startup: nonblank `NOX_DISCORD_VERSION`, then incorporated `dist/build-info.json`, then `dev`. Health and info share exactly that value. Local source runs and builds without explicit build metadata use `dev`, irrespective of the package version.
+The application resolves one version at startup: nonblank `NOX_BOT_VERSION`, then incorporated `dist/build-info.json`, then `dev`. Health and info share exactly that value. Local source runs and builds without explicit build metadata use `dev`, irrespective of the package version.
 
-The Docker workflow fetches history/tags and uses `git describe --tags --exact-match HEAD` for an exact tag (including that command's selection when several tags coexist). Otherwise it uses `git-<full HEAD SHA>`. The build receives `NOX_DISCORD_BUILD_VERSION`; no manual application-version workflow input exists. Docker tags `pi5` and `latest` remain independent. To supply metadata to a local build, set `NOX_DISCORD_BUILD_VERSION` when running `npm run build`, or use the Docker build argument with the same name.
+The Docker workflow fetches history/tags and uses `git describe --tags --exact-match HEAD` for an exact tag (including that command's selection when several tags coexist). Otherwise it uses `git-<full HEAD SHA>`. The build receives `NOX_BOT_BUILD_VERSION`; no manual application-version workflow input exists. Docker tags `pi5` and `latest` remain independent. To supply metadata to a local build, set `NOX_BOT_BUILD_VERSION` when running `npm run build`, or use the Docker build argument with the same name.
 
 The base Compose remains unchanged and publishes no port. For local API access on the Pi, configure its separate key in `.env` and run:
 
@@ -180,12 +180,12 @@ The base Compose remains unchanged and publishes no port. For local API access o
 docker compose -f docker-compose.yml -f docker-compose.api.yml up -d
 ```
 
-The override enables HTTP, binds to `0.0.0.0` inside the container, publishes only `127.0.0.1:${NOX_DISCORD_API_PORT:-3100}` on the host, and allows 15 seconds for shutdown. Existing prefix-command mounts remain intact. To expose access beyond the host, explicitly change publication and use your chosen private network/tunnel or HTTPS proxy. The image continues to target only `linux/arm64`; AMD64 would require separate native `nodehun` validation.
+The override enables HTTP, binds to `0.0.0.0` inside the container, publishes only `127.0.0.1:${NOX_BOT_API_PORT:-3100}` on the host, and allows 15 seconds for shutdown. Existing prefix-command mounts remain intact. To expose access beyond the host, explicitly change publication and use your chosen private network/tunnel or HTTPS proxy. The image continues to target only `linux/arm64`; AMD64 would require separate native `nodehun` validation.
 
 SIGINT/SIGTERM and fatal failures share bounded cleanup: stop new HTTP work, drain accepted operations, close connections and destroy the existing Client. Startup cannot continue after shutdown. Normal cleanup is idempotent with a total 10-second deadline.
 
 ## Validation
 
-Run `npm run typecheck` and `npm test`. The suite builds the project and tests contracts over local HTTP, Discord operations with fake managers and real local permission objects, version resolution, logging, registration, commands and lifecycle. It does not load `.env` or log into Discord. CI uses Node 22 and runs before image publication.
+Run `npm run typecheck` and `npm test`. The suite builds the project and tests contracts over local HTTP, Discord operations with fake managers and real local permission objects, version resolution, logging, registration, commands and lifecycle. It does not load `.env` or log into Discord. CI uses Node 24 and runs before image publication.
 
 For live acceptance in a development guild, check `/nox ping`, a prefix command, API channel selection, a successful message, denied-channel handling, readiness after reconnection, and `docker compose stop`. These checks require an explicitly configured live Discord deployment and are separate from the offline suite.

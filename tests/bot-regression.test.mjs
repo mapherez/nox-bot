@@ -1,59 +1,18 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { Routes, SlashCommandBuilder } from "discord.js";
-import Bot from "../dist/services/bot.js";
-import CommandHandler from "../dist/services/commandHandler.js";
-import CommandRegistrar from "../dist/services/commandRegistrar.js";
-import { quietLogger } from "./helpers.mjs";
-
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import Bot from '../dist/services/bot.js';
+import { until, quietLogger } from './helpers.mjs';
 quietLogger();
-
-test("slash interaction routing remains intact and shutdown removes only owned listeners", async () => {
-  const bot = new Bot([1, 512, 32768]);
-  const calls = [];
-  const handler = new CommandHandler();
-  handler.commands.set("test", { execute: async (interaction) => calls.push(interaction) });
-  bot.setCommandHandler(handler);
-  const interaction = { isButton: () => false, isChatInputCommand: () => true, commandName: "test" };
-  await bot.client.listeners("interactionCreate")[0](interaction);
-  assert.deepEqual(calls, [interaction]);
-  const external = () => {};
-  bot.client.on("messageCreate", external);
-  const stopping = bot.destroy();
-  assert.equal(bot.destroy(), stopping);
-  await stopping;
-  assert.deepEqual(bot.client.listeners("messageCreate"), [external]);
-  assert.equal(bot.client.listenerCount("interactionCreate"), 0);
-  assert.equal(bot.client.listenerCount("clientReady"), 0);
-  bot.client.off("messageCreate", external);
+test('interaction routing and shutdown preserve external listeners', async () => {
+  const bot = new Bot([1, 512, 32768]), calls = []; bot.attach({ handle: async value => calls.push(value), close() {} }, {}, {});
+  const interaction = {}; bot.client.emit('interactionCreate', interaction); await until(() => calls.length === 1); assert.deepEqual(calls, [interaction]);
+  const external = () => {}; bot.client.on('messageCreate', external); const stopping = bot.destroy(); assert.equal(bot.destroy(), stopping); await stopping; assert.deepEqual(bot.client.listeners('messageCreate'), [external]); assert.equal(bot.client.listenerCount('interactionCreate'), 0); assert.equal(bot.client.listenerCount('clientReady'), 0); bot.client.off('messageCreate', external);
 });
-
-test("prefix commands still delete input, send a normal message and ignore bot messages", async (t) => {
-  const bot = new Bot([1, 512, 32768]);
-  t.after(() => bot.destroy());
-  bot.prefixCommands = { test: "original response", zed: "last" };
-  const calls = [];
-  const message = { author: { bot: false }, content: "!TEST argument", delete: async () => calls.push("delete"), channel: { send: async (content) => calls.push(content) } };
-  const handle = bot.client.listeners("messageCreate")[0];
-  await handle(message);
-  assert.deepEqual(calls, ["delete", "original response"]);
-  calls.length = 0;
-  await handle({ ...message, content: "!help" });
-  assert.deepEqual(calls, ["delete", "Available commands:\n!test, !zed"]);
-  calls.length = 0;
-  await handle({ ...message, author: { bot: true } });
-  assert.deepEqual(calls, []);
-  assert.equal(bot.client.rest.options.rejectOnRateLimit, null);
-});
-
-test("registration remains development-guild or global with the existing REST service", async () => {
-  const command = new SlashCommandBuilder().setName("test").setDescription("test");
-  for (const guilds of [[], ["8", "9"]]) {
-    const registrar = new CommandRegistrar("fake-discord-token", "7", guilds);
-    const calls = [];
-    registrar.rest.put = async (...args) => calls.push(args);
-    await registrar.registerCommands([command]);
-    assert.deepEqual(calls.map(([route]) => route), guilds.length ? guilds.map((id) => Routes.applicationGuildCommands("7", id)) : [Routes.applicationCommands("7")]);
-    assert.deepEqual(calls[0][1], { body: [command] });
-  }
+test('Quick Commands are case insensitive, guild scoped, public and send even when cleanup fails', async t => {
+  const bot = new Bot([1, 512, 32768]); t.after(() => bot.destroy()); const calls = [];
+  bot.attach({ handle: async () => {}, close() {} }, { response: (guild, trigger) => guild === '1' && trigger === 'test' ? 'original response' : undefined, list: guild => guild === '1' ? [{ data: { trigger: 'test' } }, { data: { trigger: 'zed' } }] : [] }, { send: async (target, content) => calls.push({ target, content }) });
+  const message = { guildId: '1', channelId: '2', author: { bot: false }, content: '!TEST ignored arguments', delete: async () => { calls.push('delete'); throw new Error('No permission'); } };
+  bot.client.emit('messageCreate', message); await until(() => calls.length === 2); assert.equal(calls[1].content.content, 'original response'); assert.deepEqual(calls[1].target, { provider: 'discord', kind: 'guild-channel', guildId: '1', channelId: '2' });
+  calls.length = 0; bot.client.emit('messageCreate', { ...message, content: '!help' }); await until(() => calls.length === 2); assert.equal(calls[1].content.content, '!test, !zed');
+  calls.length = 0; bot.client.emit('messageCreate', { ...message, guildId: '2' }); bot.client.emit('messageCreate', { ...message, author: { bot: true } }); bot.client.emit('messageCreate', { ...message, guildId: null }); await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(calls, []); assert.equal(bot.client.rest.options.rejectOnRateLimit, null);
 });

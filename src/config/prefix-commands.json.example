@@ -1,6 +1,0 @@
-{
-  "hello": "Hey!",
-  "love": "https://myimageservice.com/image1.png",
-  "test": "This is a test response!",
-  "help": "Available commands: !hello, !love, !test, !help"
-}

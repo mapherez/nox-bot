@@ -1,92 +1,50 @@
-# Nox Discord Bot - Pi 5 Docker deployment files
+# NoX Bot deployment
 
-## Files to copy into the repo
+The same Compose stack supports `linux/arm64` (including Raspberry Pi 5) and `linux/amd64`. Node 24 runs the bot and dashboard. SpacetimeDB 2.10.2 runs on the same host with private networking and persistent data/signing-key volumes.
 
-```txt
-Dockerfile
-.dockerignore
-.github/workflows/docker-image.yml
+## Prepare
+
+1. Copy `.env.example` to `.env` and set the bot token, application ID, OAuth secret, explicit owner ID, public HTTPS origin and two separate base64 keys.
+2. Register `https://YOUR_HOST/auth/callback` in Discord Developer Portal. Enable Message Content intent if using Quick Commands.
+3. Configure the existing HTTPS proxy to `127.0.0.1:3200`. Proxy `/auth/*`, `/dashboard/api/*` and assets on the same origin. Disable buffering for SSE and allow long-lived event streams. The application determines Secure cookies from `NOX_BOT_PUBLIC_URL`, rather than trusting arbitrary forwarded headers.
+
+```sh
+docker compose build
+docker compose up -d
+docker compose logs --tail 100 nox-bot state-init
 ```
 
-## File to copy onto the Raspberry Pi
+The controlled `state-init` service creates the publisher and service identities, publishes the module and authorizes only the service through an owner-checked reducer. The application mounts only service credentials read-only; it cannot authorize arbitrary clients. The publisher volume is mounted only by the initializer. Module updates use migration preflight and never request deletion of database state.
 
-```txt
-docker-compose.yml
-docker-compose.api.yml # Optional, only when enabling the control API.
-.env.example
-```
+The one-shot `state-volume-init` sets ownership and private permissions on new data/signing volumes before the official DB server runs as its unprivileged user. Data and signing keys survive container recreation.
 
-Rename `.env.example` to `.env` on the Pi and fill in your real tokens.
+The dashboard is published in loopback. The database has no published port. Do not add a public DB port for the dashboard: browsers communicate only with the backend API and sanitized SSE.
 
-## Production module loading
+## Optional Control API
 
-The current loaders already accept both `.ts` and compiled `.js` files. No production loader patch is needed.
+Provide an independent `NOX_BOT_API_KEY` and enable the existing override:
 
-## Build image manually from GitHub
-
-Go to:
-
-```txt
-GitHub → Actions → Build Docker image → Run workflow
-```
-
-Use:
-
-```txt
-tag: pi5
-push_latest: true
-```
-
-This publishes:
-
-```txt
-ghcr.io/mapherez/nox-discord-bot:pi5
-ghcr.io/mapherez/nox-discord-bot:latest
-```
-
-Publication requires the offline test suite to pass. The internal application version is the exact Git tag on the published commit, or `git-<full commit SHA>` when untagged. Docker tags `pi5` and `latest` do not determine that version. An optional `NOX_DISCORD_VERSION` runtime override takes precedence; unversioned local builds use `dev`. Published platforms remain `linux/arm64`.
-
-## Optional local control API
-
-Set a separate `NOX_DISCORD_API_KEY` in `.env`, copy `docker-compose.api.yml` to the Pi, and use:
-
-```bash
+```sh
 docker compose -f docker-compose.yml -f docker-compose.api.yml up -d
 ```
 
-The override enables HTTP inside the container and publishes port 3100 only on the Pi's loopback address. `NOX_DISCORD_API_PORT` can change that port. The base Compose continues to publish no port; the prefix-command mount is preserved. The override allows 15 seconds for graceful shutdown.
+The Control API publishes only a loopback port by default. `/v1` bearer authentication, validation and error contracts are preserved. It uses the same live Discord client and permissions as the dashboard and bot.
 
-See [control API documentation](docs/control-api.md) for authentication, endpoint contracts, versioning and explicit remote-access configuration.
+## Migration
 
-## On the Raspberry Pi 5
+Run the explicit import script with a mandatory guild ID and old JSON path after initialization. Use dry run first; consult the main README. No JSON file is mounted into the application, and the legacy Weather key is only read when explicitly selected by the importer.
 
-Create a folder:
+## Backups and shutdown
 
-```bash
-mkdir -p ~/docker/nox-discord-bot
-cd ~/docker/nox-discord-bot
+Back up the `spacetime-data`, `spacetime-signing`, `state-publisher` and `state-service` volumes together with the external encryption/session keys and deployment secrets. Signing keys must persist so saved identity tokens remain valid. Treat credential volumes as secrets. Take consistent DB backups while the service is stopped or using the server's supported backup facilities.
+
+```sh
+docker compose stop
+docker compose start
 ```
 
-Copy these files into it:
+The bot stops accepting HTTP work, closes SSE, disposes plugin processes and disconnects Discord. Its internal deadline is ten seconds; Compose grants fifteen seconds. Plugin dispose has a timeout followed by forced termination. A DB interruption after initialization keeps the last confirmed runtime operational. A cold start awaits a confirmed snapshot.
 
-```txt
-docker-compose.yml
-.env
-prefix-commands.json
-```
+## Existing image workflow
 
-Then run:
-
-```bash
-docker compose pull
-docker compose up -d
-docker compose logs -f
-```
-
-## Update later
-
-```bash
-cd ~/docker/nox-discord-bot
-docker compose pull
-docker compose up -d
-```
+The existing manual GitHub workflow builds `linux/arm64,linux/amd64`. Do not run it merely to validate locally. Set `NOX_BOT_IMAGE_TAG` when consuming an existing image; default `pi5` preserves the current deployment tag. The repository/GHCR rename and Discord branding/callback are separate external operations.
