@@ -43,7 +43,7 @@ The SpacetimeDB server/CLI and SDK are fixed to **2.10.2**. Dockerfile, Compose 
 
 The separate manual SpacetimeDB image workflow builds an ARM64 candidate for 16 KB kernels while keeping AMD64 allocator defaults, and updates `latest` after both architectures pass. See [the publication and host validation procedure](DEPLOYMENT.md#spacetimedb-on-arm64-hosts-with-16-kb-pages). `NOX_BOT_SPACETIMEDB_IMAGE` can select a candidate for CLI and DB tests.
 
-Copy `.env.example` to `.env`, configure the required values and follow [deployment](DEPLOYMENT.md). For a local OAuth callback, use an explicitly registered `http://127.0.0.1:3200/auth/callback` and that exact public origin. HTTP is accepted only on localhost. `npm run dev` runs the backend; `npm run dev --workspace web` runs Vite with same-origin API proxies. Set the OAuth public origin to the actual browser origin during Vite development.
+Copy `.env.example` to `.env`, configure the required values and follow [deployment](DEPLOYMENT.md). For a local OAuth callback, use an explicitly registered `http://127.0.0.1:3200/auth/callback` and that exact public origin. HTTP also accepts private LAN IPs; HTTPS accepts any host. For direct LAN access through Compose, set `NOX_BOT_DASHBOARD_BIND_ADDRESS` to the host's LAN IP and `NOX_BOT_PUBLIC_URL` to the exact browser origin. `npm run dev` runs the backend; `npm run dev --workspace web` runs Vite with same-origin API proxies. Set the OAuth public origin to the actual browser origin during Vite development.
 
 ## Owner authentication and secrets
 

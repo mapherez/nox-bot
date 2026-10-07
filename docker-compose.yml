@@ -55,7 +55,7 @@ services:
       NOX_BOT_DASHBOARD_PORT: "3200"
     volumes:
       - state-service:/run/nox-bot/service:ro
-    ports: ["127.0.0.1:${NOX_BOT_DASHBOARD_PORT:-3200}:3200"]
+    ports: ["${NOX_BOT_DASHBOARD_BIND_ADDRESS:-127.0.0.1}:${NOX_BOT_DASHBOARD_PORT:-3200}:3200"]
     depends_on:
       state-init:
         condition: service_completed_successfully

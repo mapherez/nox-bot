@@ -18,7 +18,20 @@ The controlled `state-init` service creates the publisher and service identities
 
 The one-shot `state-volume-init` sets ownership and private permissions on new data/signing volumes before the DB server runs as its unprivileged user. Data and signing keys survive container recreation.
 
-The dashboard is published in loopback. The database has no published port. Do not add a public DB port for the dashboard: browsers communicate only with the backend API and sanitized SSE.
+The dashboard is published in loopback by default. The database has no published port. Do not add a public DB port for the dashboard: browsers communicate only with the backend API and sanitized SSE.
+
+### Direct LAN dashboard access
+
+To use the dashboard from other LAN machines, set the host's private LAN IP as the Compose publication address and use that exact browser origin. For example, in the deployment `.env`:
+
+```dotenv
+NOX_BOT_DASHBOARD_BIND_ADDRESS=192.168.1.50
+NOX_BOT_PUBLIC_URL=http://192.168.1.50:3200
+```
+
+Replace the example IP with your host's actual LAN address and register `http://192.168.1.50:3200/auth/callback` with the matching address in Discord Developer Portal. Recreate the bot container after changing these values. Compose retains `0.0.0.0` inside the container; `NOX_BOT_DASHBOARD_BIND_ADDRESS` controls only the host interface. For a process running outside Docker, set `NOX_BOT_DASHBOARD_HOST` to the LAN address as well.
+
+HTTP origins allow localhost, loopback addresses, IPv4 private ranges (`10/8`, `172.16/12`, `192.168/16`) and IPv6 unique local addresses (`fc00::/7`). Other HTTP hostnames and public IPs are rejected; use HTTPS for them. HTTP LAN cookies remain HttpOnly and SameSite=Lax but travel without TLS. Owner-only authorization, session expiry and exact Origin/CSRF validation still apply. HTTPS retains Secure cookies. The default loopback publication and existing HTTPS proxy setup remain available.
 
 ## Optional Control API
 

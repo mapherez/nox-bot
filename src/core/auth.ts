@@ -4,6 +4,7 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "node:crypto";
+import { isIP } from "node:net";
 import type { Session, StateStore } from "./state.js";
 import { registerSecret } from "../utils/logger.js";
 import { validateId } from "../controlApi.js";
@@ -33,6 +34,21 @@ export class AuthError extends Error {
     super(message);
   }
 }
+function allowsHttp(hostname: string): boolean {
+  // URL.hostname is normalized, but IPv6 literals still include brackets.
+  const host = hostname.startsWith("[") ? hostname.slice(1, -1) : hostname;
+  if (host === "localhost") return true;
+  if (isIP(host) === 4) {
+    const [first, second] = host.split(".").map(Number);
+    return (
+      first === 127 ||
+      first === 10 ||
+      (first === 172 && second >= 16 && second <= 31) ||
+      (first === 192 && second === 168)
+    );
+  }
+  return isIP(host) === 6 && (host === "::1" || /^f[cd][0-9a-f]{2}:/.test(host));
+}
 export function loadAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
   for (const name of [
     "DISCORD_CLIENT_ID",
@@ -49,9 +65,12 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
     origin.pathname !== "/" ||
     origin.search ||
     origin.hash ||
-    !["http:", "https:"].includes(origin.protocol)
+    (origin.protocol !== "https:" &&
+      !(origin.protocol === "http:" && allowsHttp(origin.hostname)))
   )
-    throw new Error("Dashboard URL must be an HTTP or HTTPS origin.");
+    throw new Error(
+      "Dashboard URL must be an HTTPS origin, or HTTP on localhost or a private LAN IP.",
+    );
   validateId(env.DISCORD_CLIENT_ID);
   validateId(env.NOX_BOT_OWNER_DISCORD_USER_ID);
   const bytes = Buffer.from(env.NOX_BOT_SESSION_SECRET!, "base64");
