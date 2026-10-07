@@ -8,7 +8,11 @@ Copy **Server MCP URL** from the dashboard's **Server** tab into your client. Th
 https://bot.example.com/mcp/guilds/123456789
 ```
 
-For local development, use your configured public origin, for example `http://127.0.0.1:3200/mcp/guilds/123456789`. A reverse proxy must forward `/mcp/` to the dashboard listener and support streaming responses. The copied URL uses the configured backend origin even when the dashboard is opened through Vite.
+For local development, use your configured public origin, for example `http://127.0.0.1:3200/mcp/guilds/123456789`. A reverse proxy must forward `/mcp/` to the dashboard listener. The copied URL uses the configured backend origin even when the dashboard is opened through Vite.
+
+The stateless HTTP transport returns JSON for `initialize`, `tools/list` and `tools/call`, matching NoX Yard. In Postman, POST JSON with `Content-Type: application/json`; `Accept: application/json`, the default `*/*` or an omitted Accept header work without adding `text/event-stream`. Standard MCP clients advertising both JSON and SSE also receive JSON. Initialization notifications return HTTP 202 with an empty body. No MCP session ID is required; GET and DELETE session endpoints return 405. The SDK's modern per-request protocol remains supported.
+
+`@nox/mcp` v0.4.1's TypeScript helper fixes the 2025 transport to SSE and does not expose a JSON option. A small HTTP adapter composes the SDK's stateless JSON transport with the same NoX server factory, preserving the library's tool validation, execution limits and cancellation. No business logic runs in this adapter.
 
 No Authorization header, cookie or CSRF token is needed. Anyone with network access to a guild's endpoint can use all of its tools. The dashboard remains owner-authenticated and the Control API keeps its independent bearer authentication.
 

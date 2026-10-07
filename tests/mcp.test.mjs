@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
+import {
   ChannelType,
   PermissionFlagsBits,
   PermissionsBitField,
@@ -195,6 +199,125 @@ function failure(result, code) {
   if (code) assert.equal(result.structuredContent.code, code);
   return result.structuredContent;
 }
+
+test("guild MCP accepts JSON and default HTTP clients without requiring SSE", async (t) => {
+  const f = await fixture(t);
+  for (const accept of [
+    undefined,
+    "*/*",
+    "application/json",
+    "application/json, text/event-stream",
+  ]) {
+    const headers = { "Content-Type": "application/json" };
+    if (accept !== undefined) headers.Accept = accept;
+    const initialized = await f.rpc(
+      "initialize",
+      {
+        protocolVersion: "2025-11-25",
+        capabilities: {},
+        clientInfo: { name: "json-client", version: "1" },
+      },
+      "1",
+      { headers },
+    );
+    assert.equal(
+      initialized.response.status,
+      200,
+      JSON.stringify(initialized.data),
+    );
+    assert.match(
+      initialized.response.headers.get("content-type"),
+      /^application\/json/,
+    );
+    assert.equal(initialized.response.headers.get("mcp-session-id"), null);
+    const listed = await f.rpc("tools/list", {}, "1", { headers });
+    assert.equal(listed.response.status, 200);
+    assert.equal(listed.data.result.tools.length, 14);
+    const result = await f.call("guild_get_id", {}, "2", { headers });
+    assert.equal(success(result).guildId, "2");
+    const notified = await fetch(`${f.origin}/mcp/guilds/1`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      }),
+    });
+    assert.equal(notified.status, 202);
+    assert.equal(await notified.text(), "");
+  }
+  for (const method of ["GET", "DELETE"]) {
+    const response = await fetch(`${f.origin}/mcp/guilds/1`, { method });
+    assert.equal(response.status, 405);
+  }
+  for (const accept of [
+    "text/event-stream",
+    "text/plain",
+    "application/json;q=0, */*;q=1",
+  ]) {
+    const response = await fetch(`${f.origin}/mcp/guilds/1`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: accept },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    assert.equal(response.status, 406);
+    await response.arrayBuffer();
+  }
+});
+
+test("MCP SDK clients connect, discover and call guild tools over JSON in both protocol modes", async (t) => {
+  const f = await fixture(t);
+  for (const mode of ["legacy", "auto"]) {
+    const exchanges = [];
+    const client = new Client(
+      { name: "http-client", version: "1" },
+      {
+        versionNegotiation: { mode },
+      },
+    );
+    t.after(() => client.close());
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(`${f.origin}/mcp/guilds/1`), {
+        fetch: async (url, init) => {
+          const response = await fetch(url, init);
+          exchanges.push({
+            method: init?.method,
+            status: response.status,
+            type: response.headers.get("content-type"),
+          });
+          return response;
+        },
+      }),
+      { timeout: 3000 },
+    );
+    assert.equal(client.getServerVersion().name, "nox-bot-1");
+    const { tools } = await client.listTools();
+    assert.deepEqual(
+      Object.fromEntries(tools.map((tool) => [tool.name, tool._meta.cli])),
+      metadata,
+    );
+    assert.equal(
+      success(await client.callTool({ name: "guild_get_id", arguments: {} }))
+        .guildId,
+      "1",
+    );
+    assert.equal(
+      success(await client.callTool({ name: "status", arguments: {} })).process
+        .state,
+      "running",
+    );
+    assert.ok(
+      exchanges.some(
+        (exchange) => exchange.method === "POST" && exchange.status === 200,
+      ),
+    );
+    for (const exchange of exchanges.filter(
+      (exchange) => exchange.method === "POST" && exchange.status === 200,
+    ))
+      assert.match(exchange.type, /^application\/json/);
+    await client.close();
+  }
+});
 
 test("guild MCP is always available without auth, exposes exactly 14 strict tools and preserves CLI metadata", async (t) => {
   const f = await fixture(t);

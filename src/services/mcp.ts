@@ -1,10 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import {
-  createHttpHandler,
-  McpError,
-  type ExecutionContext,
-  type ToolDefinition,
-} from "@nox/mcp";
+import { McpError, type ExecutionContext, type ToolDefinition } from "@nox/mcp";
 import { toNodeHandler } from "@nox/mcp/node";
 import { z } from "zod";
 import {
@@ -20,6 +15,7 @@ import type { QuickCommandService } from "../core/quickCommands.js";
 import type { PluginManager } from "../plugins/manager.js";
 import type { GuildConfigurationService } from "./guildConfiguration.js";
 import Logger from "../utils/logger.js";
+import { createJsonHttpHandler } from "./mcpHttp.js";
 
 const empty = z.strictObject({});
 const pluginInput = z.strictObject({ pluginId: z.string() });
@@ -105,7 +101,9 @@ export function formatMcpError(error: unknown) {
 export class GuildMcpServer {
   private stopping = false;
   private readonly active = new Set<Promise<unknown>>();
-  private readonly handlers = new Set<ReturnType<typeof createHttpHandler>>();
+  private readonly handlers = new Set<
+    ReturnType<typeof createJsonHttpHandler>
+  >();
   private closing?: Promise<void>;
 
   constructor(private readonly services: McpDependencies) {}
@@ -436,7 +434,7 @@ export class GuildMcpServer {
     if (response.destroyed) return;
     this.assertAvailable(true);
     const onerror = () => Logger.warn("MCP request failed.");
-    const handler = createHttpHandler({
+    const handler = createJsonHttpHandler({
       appId: "nox-bot",
       name: `nox-bot-${guildId}`,
       version: this.services.info.version,
