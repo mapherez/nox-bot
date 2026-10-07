@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { randomBytes } from "node:crypto";
+import { getSpacetimeImage } from "./spacetime-image.mjs";
 
 // Explicit local images only. Never load deployment .env, start the real bot or publish images.
 const architecture = process.argv[2];
@@ -30,6 +31,9 @@ await writeFile(
   override,
   JSON.stringify({
     services: {
+      ...(process.env.NOX_BOT_SPACETIMEDB_IMAGE === undefined
+        ? {}
+        : { spacetimedb: { image: getSpacetimeImage() } }),
       "nox-bot": {
         entrypoint: ["node", "/app/tests/fixtures/compose-state-smoke.mjs"],
         volumes: [

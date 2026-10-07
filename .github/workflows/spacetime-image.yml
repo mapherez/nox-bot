@@ -1,0 +1,185 @@
+name: Build SpacetimeDB image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spacetime-image-publication
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/mapherez/nox-spacetimedb
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    if: github.repository == 'mapherez/nox-bot' && github.ref == 'refs/heads/main'
+    name: Build and test ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      NOX_BOT_SPACETIMEDB_IMAGE: nox-spacetimedb:candidate-${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install native test tooling
+        run: sudo apt-get update && sudo apt-get install -y python3 make g++ pkg-config libhunspell-dev
+      - name: Reserve disk for the native Rust build
+        run: |
+          # Only unused toolchains on the disposable GitHub-hosted runner.
+          sudo rm -rf -- /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h /
+      - run: npm ci
+      - uses: docker/setup-buildx-action@v3
+      - name: Build candidate locally
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/spacetime.Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: ${{ env.NOX_BOT_SPACETIMEDB_IMAGE }}
+          provenance: false
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=spacetime-58d2a407-${{ matrix.arch }}-pages64k
+          cache-to: type=gha,mode=max,scope=spacetime-58d2a407-${{ matrix.arch }}-pages64k
+      - name: Verify candidate binaries, metadata and runtime layout
+        run: node scripts/test-spacetime-image.mjs "${{ matrix.arch }}"
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build module and test the candidate database
+        run: npm run test:state
+      - name: Build the bot using the candidate CLI
+        # The default Docker builder can resolve the candidate loaded into the local image store.
+        run: docker buildx build --builder default --platform "linux/${{ matrix.arch }}" --build-arg "NOX_BOT_SPACETIMEDB_IMAGE=$NOX_BOT_SPACETIMEDB_IMAGE" --load -t "nox-bot:validation-${{ matrix.arch }}" .
+      - name: Test Compose bootstrap and persistent volumes
+        run: node scripts/test-compose.mjs "${{ matrix.arch }}"
+      - name: Test bot image and Docker SIGTERM
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          for mode in enabled disabled; do
+            docker run --rm --platform "linux/$ARCH" --mount "type=bind,source=$PWD/tests,target=/app/tests,readonly" --entrypoint node "nox-bot:validation-$ARCH" /app/tests/fixtures/docker-smoke.mjs "$mode"
+          done
+          container="nox-bot-shutdown-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$ARCH"
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          docker run -d --name "$container" --platform "linux/$ARCH" --mount "type=bind,source=$PWD/tests,target=/app/tests,readonly" --entrypoint node "nox-bot:validation-$ARCH" /app/tests/fixtures/docker-shutdown.mjs
+          ready=false
+          for ((attempt=0; attempt<60; attempt++)); do
+            if docker logs "$container" 2>&1 | grep -q READY_FOR_DOCKER_STOP; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+          docker stop --time 15 "$container"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" = 0
+          docker logs "$container" > .tmp/shutdown.log 2>&1
+          grep -q API_CLOSED .tmp/shutdown.log
+          grep -q BOT_DESTROYED .tmp/shutdown.log
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish the tested build by digest
+        id: publish
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/spacetime.Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          provenance: false
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=spacetime-58d2a407-${{ matrix.arch }}-pages64k
+      - name: Verify published config matches the tested image and save digest
+        env:
+          DIGEST: ${{ steps.publish.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p .tmp/published digests
+          docker buildx imagetools inspect "$IMAGE@$DIGEST" --raw > .tmp/published/manifest.json
+          docker pull --platform "linux/$ARCH" "$IMAGE@$DIGEST"
+          docker image inspect "$NOX_BOT_SPACETIMEDB_IMAGE" --format '{{.Id}}' > .tmp/published/tested-config.txt
+          docker image inspect "$IMAGE@$DIGEST" --format '{{.Id}}' > .tmp/published/pulled-config.txt
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          assert.match(process.env.DIGEST, /^sha256:[a-f0-9]{64}$/);
+          const manifest = JSON.parse(readFileSync('.tmp/published/manifest.json', 'utf8'));
+          const testedConfig = readFileSync('.tmp/published/tested-config.txt', 'utf8').trim();
+          assert.equal(manifest.config.digest, testedConfig, 'Published image differs from the tested candidate.');
+          assert.equal(readFileSync('.tmp/published/pulled-config.txt', 'utf8').trim(), testedConfig, 'Pulled image differs from the tested candidate.');
+          writeFileSync(`digests/${process.env.ARCH}.json`, JSON.stringify({ architecture: process.env.ARCH, digest: process.env.DIGEST }));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spacetime-digest-${{ matrix.arch }}
+          path: digests/*.json
+          if-no-files-found: error
+
+  manifest:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: spacetime-digest-*
+          path: digests
+          merge-multiple: true
+      - name: Assemble, validate and promote the manifest
+        env:
+          RECIPE_SHA: ${{ github.sha }}
+        run: |
+          amd64=$(node -p "JSON.parse(require('node:fs').readFileSync('digests/amd64.json', 'utf8')).digest")
+          arm64=$(node -p "JSON.parse(require('node:fs').readFileSync('digests/arm64.json', 'utf8')).digest")
+          candidate="$IMAGE:candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker buildx imagetools create --tag "$candidate" "$IMAGE@$amd64" "$IMAGE@$arm64"
+          node scripts/verify-spacetime-manifest.mjs "$candidate" digests
+          docker buildx imagetools inspect "$candidate" --format '{{json .Manifest}}' > .tmp-candidate-index.json
+          digest=$(node -p "JSON.parse(require('node:fs').readFileSync('.tmp-candidate-index.json', 'utf8')).digest")
+          docker buildx imagetools create --tag "$IMAGE:2.10.2-pages64k" --tag "$IMAGE:2.10.2-pages64k-$RECIPE_SHA" "$IMAGE@$digest"
+          node scripts/verify-spacetime-manifest.mjs "$IMAGE:2.10.2-pages64k" digests
+          docker buildx imagetools inspect "$IMAGE:2.10.2-pages64k" --format '{{json .Manifest}}' > .tmp-promoted-index.json
+          node -e "require('node:assert/strict').equal(JSON.parse(require('node:fs').readFileSync('.tmp-promoted-index.json', 'utf8')).digest, process.argv[1])" "$digest"
+          docker buildx imagetools inspect "$IMAGE@$digest"
+          docker pull --platform linux/amd64 "$IMAGE@$digest"
+          {
+            echo '## SpacetimeDB 2.10.2 publication'
+            echo "Pinned deployment reference: \`$IMAGE@$digest\`"
+            echo 'AMD64: upstream allocator. ARM64: JEMALLOC_SYS_WITH_LG_PAGE=16.'
+            echo 'The package visibility has not been changed. Make it public manually after reviewing manifest/digests.'
+            echo 'A real ARM64 host with getconf PAGESIZE=16384 must pass the isolated smoke before production rollout.'
+          } >> "$GITHUB_STEP_SUMMARY"

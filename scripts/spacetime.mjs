@@ -2,9 +2,9 @@ import { spawnSync } from "node:child_process";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getSpacetimeImage } from "./spacetime-image.mjs";
 
-export const SPACETIME_IMAGE =
-  "clockworklabs/spacetime@sha256:acf3210403559f731e222fb77042aac32429d7ea77a4858ffa68bd459383069d";
+export const SPACETIME_IMAGE = getSpacetimeImage();
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const command = process.argv[2];
 if (!["build", "generate"].includes(command))

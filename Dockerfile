@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
-FROM clockworklabs/spacetime@sha256:acf3210403559f731e222fb77042aac32429d7ea77a4858ffa68bd459383069d AS spacetime-toolchain
+ARG NOX_BOT_SPACETIMEDB_IMAGE=clockworklabs/spacetime@sha256:acf3210403559f731e222fb77042aac32429d7ea77a4858ffa68bd459383069d
+FROM ${NOX_BOT_SPACETIMEDB_IMAGE} AS spacetime-toolchain
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates python3 make g++ pkg-config libhunspell-dev && rm -rf /var/lib/apt/lists/*

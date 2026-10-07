@@ -3,8 +3,8 @@ import { mkdir, mkdtemp } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:net";
-const image =
-  "clockworklabs/spacetime@sha256:acf3210403559f731e222fb77042aac32429d7ea77a4858ffa68bd459383069d";
+import { getSpacetimeImage } from "./spacetime-image.mjs";
+const image = getSpacetimeImage();
 const name = `nox-bot-test-${randomBytes(4).toString("hex")}`;
 await mkdir(".tmp", { recursive: true });
 const directory = await mkdtemp(resolve(".tmp/state-run-"));
@@ -42,7 +42,11 @@ try {
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  if (!ready) throw new Error("Test SpacetimeDB did not start.");
+  if (!ready) {
+    const status = docker("inspect", "--format", "{{.State.Status}} (exit {{.State.ExitCode}})", name);
+    throw new Error(`Test SpacetimeDB did not start: ${status}. Inspect allocator/page-size compatibility.`);
+  }
+  console.log(`SpacetimeDB test kernel page size: ${docker("exec", name, "getconf", "PAGESIZE")} bytes.`);
   const child = spawn(
     process.execPath,
     [
@@ -66,6 +70,11 @@ try {
     child.on("error", reject);
     child.on("exit", (code) => resolveExit(code ?? 1));
   });
+  try {
+    console.log(`SpacetimeDB smoke memory (not a performance comparison): ${docker("stats", "--no-stream", "--format", "{{.MemUsage}}", name)}`);
+  } catch {
+    console.warn("SpacetimeDB smoke memory was unavailable after the test.");
+  }
 } finally {
   try {
     docker("rm", "-f", name);
