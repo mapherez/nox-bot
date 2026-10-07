@@ -49,15 +49,9 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
     origin.pathname !== "/" ||
     origin.search ||
     origin.hash ||
-    (origin.protocol !== "https:" &&
-      !(
-        origin.protocol === "http:" &&
-        ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)
-      ))
+    !["http:", "https:"].includes(origin.protocol)
   )
-    throw new Error(
-      "Dashboard URL must be an HTTPS origin, or HTTP localhost for development.",
-    );
+    throw new Error("Dashboard URL must be an HTTP or HTTPS origin.");
   validateId(env.DISCORD_CLIENT_ID);
   validateId(env.NOX_BOT_OWNER_DISCORD_USER_ID);
   const bytes = Buffer.from(env.NOX_BOT_SESSION_SECRET!, "base64");
