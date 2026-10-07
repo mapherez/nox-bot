@@ -1,7 +1,7 @@
-// Change the default only after the GHCR manifest is published and validated.
+// Match the deployment and bot toolchain defaults.
 // state-volume-init intentionally continues using the original official image.
 export const DEFAULT_SPACETIME_IMAGE =
-  "clockworklabs/spacetime@sha256:acf3210403559f731e222fb77042aac32429d7ea77a4858ffa68bd459383069d";
+  "ghcr.io/mapherez/nox-spacetimedb:latest";
 
 export function getSpacetimeImage(env = process.env) {
   const image = env.NOX_BOT_SPACETIMEDB_IMAGE ?? DEFAULT_SPACETIME_IMAGE;

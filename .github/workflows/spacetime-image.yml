@@ -172,15 +172,19 @@ jobs:
           node scripts/verify-spacetime-manifest.mjs "$candidate" digests
           docker buildx imagetools inspect "$candidate" --format '{{json .Manifest}}' > .tmp-candidate-index.json
           digest=$(node -p "JSON.parse(require('node:fs').readFileSync('.tmp-candidate-index.json', 'utf8')).digest")
-          docker buildx imagetools create --tag "$IMAGE:2.10.2-pages64k" --tag "$IMAGE:2.10.2-pages64k-$RECIPE_SHA" "$IMAGE@$digest"
+          docker buildx imagetools create --tag "$IMAGE:latest" --tag "$IMAGE:2.10.2-pages64k" --tag "$IMAGE:2.10.2-pages64k-$RECIPE_SHA" "$IMAGE@$digest"
           node scripts/verify-spacetime-manifest.mjs "$IMAGE:2.10.2-pages64k" digests
           docker buildx imagetools inspect "$IMAGE:2.10.2-pages64k" --format '{{json .Manifest}}' > .tmp-promoted-index.json
           node -e "require('node:assert/strict').equal(JSON.parse(require('node:fs').readFileSync('.tmp-promoted-index.json', 'utf8')).digest, process.argv[1])" "$digest"
+          node scripts/verify-spacetime-manifest.mjs "$IMAGE:latest" digests
+          docker buildx imagetools inspect "$IMAGE:latest" --format '{{json .Manifest}}' > .tmp-latest-index.json
+          node -e "require('node:assert/strict').equal(JSON.parse(require('node:fs').readFileSync('.tmp-latest-index.json', 'utf8')).digest, process.argv[1])" "$digest"
           docker buildx imagetools inspect "$IMAGE@$digest"
           docker pull --platform linux/amd64 "$IMAGE@$digest"
           {
             echo '## SpacetimeDB 2.10.2 publication'
-            echo "Pinned deployment reference: \`$IMAGE@$digest\`"
+            echo "Deployment reference: \`$IMAGE:latest\`"
+            echo "Published manifest digest: \`$digest\`"
             echo 'AMD64: upstream allocator. ARM64: JEMALLOC_SYS_WITH_LG_PAGE=16.'
             echo 'The package visibility has not been changed. Make it public manually after reviewing manifest/digests.'
             echo 'A real ARM64 host with getconf PAGESIZE=16384 must pass the isolated smoke before production rollout.'

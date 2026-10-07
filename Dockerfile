@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-ARG NOX_BOT_SPACETIMEDB_IMAGE=clockworklabs/spacetime@sha256:acf3210403559f731e222fb77042aac32429d7ea77a4858ffa68bd459383069d
+ARG NOX_BOT_SPACETIMEDB_IMAGE=ghcr.io/mapherez/nox-spacetimedb:latest
 FROM ${NOX_BOT_SPACETIMEDB_IMAGE} AS spacetime-toolchain
 FROM node:24-bookworm-slim AS build
 WORKDIR /app

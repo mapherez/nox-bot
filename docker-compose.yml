@@ -11,7 +11,7 @@ services:
     networks: [state]
 
   spacetimedb:
-    image: clockworklabs/spacetime@sha256:acf3210403559f731e222fb77042aac32429d7ea77a4858ffa68bd459383069d
+    image: ghcr.io/mapherez/nox-spacetimedb:latest
     restart: unless-stopped
     depends_on:
       state-volume-init:
