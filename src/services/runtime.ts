@@ -126,13 +126,17 @@ export class Runtime implements ManagedRuntime {
       messaging,
     );
     this.dashboard = new DashboardServer(
-      listener,
+      { ...listener, publicOrigin: authConfig.origin },
       this.auth,
       this.state,
       operations,
       this.plugins,
       quick,
       (id) => this.commandStates.get(id) ?? { state: "pending" },
+      messaging,
+      registry,
+      info,
+      processState,
     );
     if (apiConfig.enabled)
       this.api = new ControlApi(

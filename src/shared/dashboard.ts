@@ -29,6 +29,7 @@ export interface QuickCommandDTO {
 }
 export interface GuildSnapshot {
   guildId: string;
+  mcp: { url: string };
   revision: string;
   synchronization: string;
   initialized: boolean;

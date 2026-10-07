@@ -204,7 +204,9 @@ export default class DiscordOperations
   async send(
     target: MessageTarget,
     content: RichContent,
+    signal?: AbortSignal,
   ): Promise<MessageReceipt> {
+    signal?.throwIfAborted();
     this.assertReady();
     if (content.components?.length)
       throw new ControlError(
@@ -230,6 +232,7 @@ export default class DiscordOperations
             "Discord users are unavailable.",
           );
         const user = await this.client.users.fetch(target.userId);
+        signal?.throwIfAborted();
         const message = await user.send(payload);
         return {
           provider: "discord",
@@ -244,6 +247,7 @@ export default class DiscordOperations
         target.channelId,
         target.guildId,
       );
+      signal?.throwIfAborted();
       const message = await channel.send(payload);
       return {
         provider: "discord",

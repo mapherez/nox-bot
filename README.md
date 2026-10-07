@@ -24,6 +24,18 @@ The backend subscribes to authenticated SpacetimeDB views and executes only conf
 
 Persistent mutations and new sessions are unavailable until a complete recovery snapshot and lifecycle/command reconciliation have finished. Writes are never queued or automatically replayed. If confirmation is lost, the outcome is unknown: wait for recovery and inspect confirmed state before trying again. Existing sessions continue within their absolute and inactivity limits. The English dashboard shows stale confirmed data and preserves open drafts. A process without a confirmed snapshot waits for the DB; there is no alternative file storage.
 
+## Guild MCP
+
+Each installed Discord server has an always-on Streamable HTTP MCP endpoint on the dashboard listener. Open the **Server** tab and copy its **Server MCP URL** into your MCP client:
+
+```text
+{NOX_BOT_PUBLIC_URL}/mcp/guilds/{guildId}
+```
+
+No token or dashboard session is required. Network access to this URL grants management and messaging access to that server. There is no MCP enable/disable setting. The URL uses the configured public origin; proxies must forward `/mcp/` to the same listener. Existing dashboard authentication and the optional bearer Control API remain unchanged.
+
+Tools are bound to the URL's server and do not accept `guildId`. They expose status, server ID, available channels, message sending, Discord command listing, plugin management and Quick Command CRUD. Plugin execution and cross-server discovery are not exposed. See [MCP contracts and usage](docs/mcp.md).
+
 `GET /health` on the dashboard listener exposes functional readiness separately from synchronization. After initial startup, a DB interruption alone does not make functional readiness fail. The opt-in Control API retains its existing `/v1` contracts; see [Control API](docs/control-api.md).
 
 ## Local development
@@ -84,4 +96,4 @@ External changes to perform separately:
 - Change the Discord application/bot branding to **NoX Bot** in Developer Portal.
 - Register the exact HTTPS `/auth/callback` URL and provide the OAuth client secret/owner ID.
 
-The existing workflow supports ARM64 and AMD64; implementation does not execute that publishing workflow, publish images, create tags/releases or change remote resources. MCP, LLMs, marketplace, external plugins, multiple tokens, billing and public registration are outside scope.
+The existing workflow supports ARM64 and AMD64; implementation does not execute that publishing workflow, publish images, create tags/releases or change remote resources. LLMs, marketplace, external plugins, multiple tokens, billing and public registration are outside scope.

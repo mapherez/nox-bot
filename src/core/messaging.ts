@@ -15,7 +15,11 @@ export interface MessageReceipt {
 }
 export interface MessagingAdapter {
   provider: "discord";
-  send(target: MessageTarget, content: RichContent): Promise<MessageReceipt>;
+  send(
+    target: MessageTarget,
+    content: RichContent,
+    signal?: AbortSignal,
+  ): Promise<MessageReceipt>;
 }
 export class MessagingService {
   private adapters = new Map<string, MessagingAdapter>();
@@ -29,7 +33,9 @@ export class MessagingService {
   async send(
     target: MessageTarget,
     content: RichContent,
+    signal?: AbortSignal,
   ): Promise<MessageReceipt> {
+    signal?.throwIfAborted();
     const adapter = this.adapters.get(target.provider);
     if (!adapter) throw new Error("Messaging provider is not available.");
     if (
@@ -38,6 +44,6 @@ export class MessagingService {
       !content.attachments?.length
     )
       throw new Error("Message content is required.");
-    return adapter.send(target, content);
+    return adapter.send(target, content, signal);
   }
 }

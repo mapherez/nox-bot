@@ -155,6 +155,7 @@ export default function App() {
     [error, setError] = useState(""),
     [pending, setPending] = useState("");
   const selected = useRef(guildId);
+  const mcpLink = useRef<HTMLInputElement>(null);
   selected.current = guildId;
   const onDirty = useCallback((value: boolean) => setDirty(value), []);
   useEffect(() => {
@@ -282,6 +283,21 @@ export default function App() {
       return;
     close();
     setGuildId(value);
+  }
+  async function copyMcpUrl() {
+    const url = snapshot?.mcp.url;
+    if (!url) return;
+    try {
+      if (!navigator.clipboard?.writeText)
+        throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(url);
+      if (selected.current === guildId) setNotice("MCP URL copied.");
+    } catch {
+      if (selected.current !== guildId) return;
+      mcpLink.current?.focus();
+      mcpLink.current?.select();
+      setNotice("Copy the selected MCP URL manually.");
+    }
   }
   async function toggle(plugin: PluginCard, enabled: boolean) {
     setPending(plugin.id);
@@ -624,6 +640,36 @@ export default function App() {
                   </button>
                 </section>
               </div>
+              <section className={s.surface}>
+                <div className={s.sectionHeading}>
+                  <div>
+                    <h2>MCP connection</h2>
+                    <p>Connect your MCP client to manage this server.</p>
+                  </div>
+                </div>
+                <label htmlFor="mcp-url" className={s.hint}>
+                  Server MCP URL
+                </label>
+                <div className={s.mcpLink}>
+                  <input
+                    ref={mcpLink}
+                    id="mcp-url"
+                    type="url"
+                    readOnly
+                    value={snapshot.mcp.url}
+                    onFocus={(event) => event.currentTarget.select()}
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className={s.secondary}
+                    onClick={() => void copyMcpUrl()}
+                    aria-label="Copy MCP URL"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </section>
               <section className={s.surface}>
                 <div className={s.sectionHeading}>
                   <div>

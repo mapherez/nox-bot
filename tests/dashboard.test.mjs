@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { AuthService } from "../dist/core/auth.js";
 import { QuickCommandService } from "../dist/core/quickCommands.js";
+import { MessagingService } from "../dist/core/messaging.js";
 import { DashboardServer } from "../dist/services/dashboard.js";
 import { memoryState } from "./fixtures/state.mjs";
 import { fakeOperations, quietLogger } from "./helpers.mjs";
@@ -28,12 +29,14 @@ async function fixture(t) {
     state = new URL(login.url).searchParams.get("state"),
     signed = await auth.completeLogin("code", state, state);
   const server = new DashboardServer(
-    { host: "127.0.0.1", port: 0 },
+    { host: "127.0.0.1", port: 0, publicOrigin: "http://localhost" },
     auth,
     f.state,
     fakeOperations(),
     f.plugins,
     new QuickCommandService(f.state),
+    undefined,
+    new MessagingService([]),
   );
   await server.start();
   t.after(() => server.stop());

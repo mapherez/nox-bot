@@ -441,6 +441,23 @@
   gap: 1rem;
   margin-bottom: 1.3rem;
 }
+.mcpLink {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+.mcpLink input {
+  flex: 1 1 16rem;
+  min-width: 0;
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: #10111b;
+  color: inherit;
+  font-size: 0.8rem;
+}
 .sectionHeading p {
   color: var(--muted);
   font-size: 0.77rem;

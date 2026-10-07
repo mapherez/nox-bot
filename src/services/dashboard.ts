@@ -11,17 +11,24 @@ import { StateError, isRecord, type StateStore } from "../core/state.js";
 import {
   ControlError,
   errorStatuses,
-  validateId,
   type DiscordOperationsContract,
+  type ProcessState,
+  type ServiceInfo,
 } from "../controlApi.js";
 import type { PluginManager } from "../plugins/manager.js";
 import type { QuickCommandService } from "../core/quickCommands.js";
 import type { GuildSnapshot } from "../shared/dashboard.js";
 import Logger from "../utils/logger.js";
+import { createServiceInfo } from "../utils/runtimeVersion.js";
+import { CommandRegistry } from "../core/commandRegistry.js";
+import type { MessagingService } from "../core/messaging.js";
+import { GuildConfigurationService } from "./guildConfiguration.js";
+import { GuildMcpServer } from "./mcp.js";
 
 interface DashboardOptions {
   host: string;
   port: number;
+  publicOrigin: string;
   assets?: string;
 }
 const cookies = (request: IncomingMessage): Record<string, string> =>
@@ -95,6 +102,9 @@ export class DashboardServer {
   );
   private streams = new Set<ServerResponse>();
   private readonly assets: string;
+  private readonly guilds: GuildConfigurationService;
+  private readonly mcp: GuildMcpServer;
+  private closing?: Promise<void>;
   constructor(
     private readonly options: DashboardOptions,
     private readonly auth: AuthService,
@@ -102,11 +112,33 @@ export class DashboardServer {
     private readonly operations: DiscordOperationsContract,
     private readonly plugins: PluginManager,
     private readonly quick: QuickCommandService,
-    private readonly commandStatus: (guildId: string) => {
+    commandStatus: (guildId: string) => {
       state: string;
       error?: string;
     } = () => ({ state: "synced" }),
+    messaging: MessagingService,
+    registry: CommandRegistry = new CommandRegistry(plugins),
+    info: ServiceInfo = createServiceInfo("dev"),
+    processState: () => ProcessState = () => "running",
   ) {
+    this.guilds = new GuildConfigurationService(
+      state,
+      operations,
+      plugins,
+      quick,
+      options.publicOrigin,
+      commandStatus,
+    );
+    this.mcp = new GuildMcpServer({
+      guilds: this.guilds,
+      operations,
+      messaging,
+      plugins,
+      quick,
+      registry,
+      info,
+      processState,
+    });
     this.assets =
       options.assets ??
       fileURLToPath(new URL("../../web/dist", import.meta.url));
@@ -125,50 +157,8 @@ export class DashboardServer {
   address() {
     return this.server.address();
   }
-  private async assertGuild(guildId: string): Promise<void> {
-    validateId(guildId);
-    if (
-      !(await this.operations.listGuilds()).some(
-        (guild) => guild.id === guildId,
-      )
-    )
-      throw new ControlError(
-        "GUILD_NOT_FOUND",
-        "The bot is not installed in this server.",
-      );
-  }
   snapshot(guildId: string): GuildSnapshot {
-    return {
-      guildId,
-      revision: this.state.revision,
-      synchronization: this.state.synchronization,
-      initialized: this.state.initialized,
-      writable: this.state.writable,
-      commandSynchronization: this.commandStatus(guildId),
-      plugins: this.plugins.definitions().map((plugin) => ({
-        id: plugin.id,
-        name: plugin.name,
-        description: plugin.description,
-        version: plugin.version,
-        icon: plugin.icon,
-        dashboardEntry: plugin.dashboardEntry,
-        configurable:
-          Object.keys(plugin.defaults).length > 0 ||
-          plugin.secretFields.length > 0,
-        commands: plugin.commands.map(({ name, usage, description }) => ({
-          name,
-          usage,
-          description,
-        })),
-        configuration: this.plugins.configuration(plugin.id, guildId),
-      })),
-      quickCommands: this.quick.list(guildId).map(({ revision, data }) => ({
-        revision,
-        trigger: data.trigger,
-        response: data.response,
-        enabled: data.enabled,
-      })),
-    };
+    return this.guilds.snapshot(guildId);
   }
   private async handle(
     request: IncomingMessage,
@@ -185,6 +175,13 @@ export class DashboardServer {
         method = request.method ?? "GET",
         jar = cookies(request),
         token = jar[this.auth.sessionCookieName];
+      if (url.pathname === "/mcp" || url.pathname.startsWith("/mcp/")) {
+        const match = /^\/mcp\/guilds\/([^/]+)$/.exec(url.pathname);
+        if (!match)
+          throw new ControlError("ROUTE_NOT_FOUND", "Route not found.");
+        await this.mcp.handle(decodeURIComponent(match[1]), request, response);
+        return;
+      }
       if (url.pathname === "/health" && method === "GET") {
         const ready =
           this.state.initialized &&
@@ -277,7 +274,7 @@ export class DashboardServer {
         if (match) {
           const guildId = decodeURIComponent(match[1]),
             resource = match[2] ?? "";
-          await this.assertGuild(guildId);
+          await this.guilds.assertGuild(guildId);
           if (!resource && method === "GET") {
             json(response, 200, this.snapshot(guildId));
             return;
@@ -332,7 +329,8 @@ export class DashboardServer {
               await this.plugins.configure(plugin[1], guildId, {
                 settings: input.settings,
                 secrets: input.secrets as
-                  Record<string, string | null> | undefined,
+                  | Record<string, string | null>
+                  | undefined,
                 expectedRevision: revision(input.expectedRevision),
               });
             }
@@ -475,7 +473,7 @@ export class DashboardServer {
       sending = true;
       try {
         this.auth.authenticate(token, false);
-        await this.assertGuild(guildId);
+        await this.guilds.assertGuild(guildId);
         if (!response.destroyed) {
           const payload = `event: snapshot\ndata: ${JSON.stringify(this.snapshot(guildId))}\n\n`;
           if (response.writableLength > 1024 * 1024) response.end();
@@ -507,13 +505,19 @@ export class DashboardServer {
     update();
   }
   stop(): Promise<void> {
+    return (this.closing ??= this.close());
+  }
+  private async close(): Promise<void> {
+    const drained = this.mcp.stop();
     for (const stream of this.streams) stream.end();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       this.server.close((error) => (error ? reject(error) : resolve()));
       this.server.closeIdleConnections();
     });
+    await drained;
   }
   forceClose(): void {
+    this.mcp.forceClose();
     for (const stream of this.streams) stream.destroy();
     this.server.closeAllConnections();
   }

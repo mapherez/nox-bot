@@ -27,11 +27,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@nox/mcp": "https://github.com/mapherez/nox-mcp/releases/download/v0.4.1/nox-mcp.tgz",
     "cheerio": "^1.0.0-rc.12",
     "discord.js": "^14.22.1",
     "dotenv": "^17.2.3",
     "nodehun": "^3.0.2",
-    "spacetimedb": "2.10.2"
+    "spacetimedb": "2.10.2",
+    "zod": "^4.6.0"
   },
   "devDependencies": {
     "@types/node": "^24.6.2",
