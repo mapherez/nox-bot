@@ -232,7 +232,7 @@ export class DashboardServer {
         url.pathname.startsWith("/auth/") ||
         url.pathname.startsWith("/dashboard/api")
       ) {
-        const session = this.auth.authenticate(
+        let session = this.auth.authenticate(
           token,
           url.pathname !== "/auth/logout",
         );
@@ -252,6 +252,9 @@ export class DashboardServer {
           json(response, 200, { ok: true });
           return;
         }
+        const refreshed = await this.auth.refreshSession(token!);
+        session = refreshed.session;
+        response.setHeader("Set-Cookie", refreshed.cookie);
         if (url.pathname === "/dashboard/api/session" && method === "GET") {
           json(response, 200, {
             user: {

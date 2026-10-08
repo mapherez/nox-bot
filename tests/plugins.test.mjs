@@ -289,7 +289,9 @@ test("OAuth admits only the owner, rejects state replay, persists hashed session
   f.disconnect();
   assert.equal(auth.authenticate(token).userId, "7");
   assert.throws(() => auth.beginLogin(), { code: "STATE_UNAVAILABLE" });
-  clock += 3600001;
+  clock += 2 * 24 * 60 * 60 * 1000;
+  assert.equal(auth.authenticate(token).userId, "7");
+  clock = result.session.expiresAt;
   assert.throws(() => auth.authenticate(token), { code: "SESSION_EXPIRED" });
 });
 test("logout waits for an in-flight session activity refresh and still invalidates the session", async (t) => {

@@ -8,7 +8,7 @@ import { DashboardServer } from "../dist/services/dashboard.js";
 import { memoryState } from "./fixtures/state.mjs";
 import { fakeOperations, quietLogger } from "./helpers.mjs";
 quietLogger();
-async function fixture(t) {
+async function fixture(t, now = Date.now) {
   const f = await memoryState(t),
     auth = new AuthService(
       f.state,
@@ -23,6 +23,7 @@ async function fixture(t) {
         authorizeURL: (state) => `https://discord.example?state=${state}`,
         identify: async () => ({ id: "7", username: "Owner", avatar: null }),
       },
+      now,
     );
   await auth.initializeOwner();
   const login = auth.beginLogin(),
@@ -55,6 +56,49 @@ async function fixture(t) {
     });
   return { ...f, auth, server, call, origin, headers };
 }
+test("dashboard renews the cookie and persisted session for one year and logout clears both", async (t) => {
+  const year = 365 * 24 * 60 * 60 * 1000;
+  let clock = 1000000;
+  const f = await fixture(t, () => clock);
+  const token = f.headers.Cookie.split("=")[1];
+  const originalExpiry = f.auth.authenticate(token, false).expiresAt;
+  clock += 180 * 24 * 60 * 60 * 1000;
+  const responses = await Promise.all([
+    f.call("/dashboard/api/session"),
+    f.call("/dashboard/api/session"),
+  ]);
+  for (const response of responses) {
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("set-cookie"), `${f.headers.Cookie}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`);
+    assert.equal((await response.json()).expiresAt, clock + year);
+  }
+  assert.equal(f.auth.authenticate(token, false).expiresAt, clock + year);
+  clock = originalExpiry + 1;
+  assert.equal((await f.call("/dashboard/api/session")).status, 200);
+  const logout = await f.call("/auth/logout", "POST", {});
+  assert.equal(logout.status, 200);
+  assert.match(logout.headers.get("set-cookie"), /^nox-session=;.*Max-Age=0$/);
+  const loggedOut = await f.call("/dashboard/api/session");
+  assert.equal(loggedOut.status, 401);
+  assert.equal(loggedOut.headers.get("set-cookie"), null);
+});
+test("dashboard upgrades an unexpired legacy session to one year without another login", async (t) => {
+  const day = 24 * 60 * 60 * 1000;
+  let clock = 1000000;
+  const f = await fixture(t, () => clock);
+  const token = f.headers.Cookie.split("=")[1];
+  const session = f.auth.authenticate(token, false);
+  await f.state.put("session", "", session.hash, {
+    ...session,
+    expiresAt: session.createdAt + day,
+  });
+  const response = await f.call("/dashboard/api/session");
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("set-cookie"), /; Max-Age=31536000$/);
+  assert.equal((await response.json()).expiresAt, clock + 365 * day);
+  clock += 2 * day;
+  assert.equal((await f.call("/dashboard/api/session")).status, 200);
+});
 test("dashboard requires owner session and verified CSRF/Origin before guild/config access", async (t) => {
   const f = await fixture(t);
   assert.equal((await fetch(`${f.origin}/dashboard/api/guilds`)).status, 401);

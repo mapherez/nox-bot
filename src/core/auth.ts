@@ -176,12 +176,10 @@ const equal = (a: string, b: string): boolean => {
     right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
 };
-const SESSION_AGE = 24 * 60 * 60 * 1000,
-  IDLE_AGE = 60 * 60 * 1000;
+const SESSION_AGE = 365 * 24 * 60 * 60 * 1000;
 
 export class AuthService {
   private pending = new Map<string, number>();
-  private activity = new Map<string, number>();
   private touches = new Map<string, Promise<void>>();
   private closing = new Set<string>();
   private revoked = new Set<string>();
@@ -311,21 +309,18 @@ export class AuthService {
       this.revoked.has(sessionHash) ||
       session.userId !== this.config.ownerId ||
       this.state.get("user", "", session.userId)?.data.role !== "owner" ||
-      session.expiresAt <= this.now() ||
-      Math.max(session.lastSeenAt, this.activity.get(sessionHash) ?? 0) +
-        IDLE_AGE <=
-        this.now()
+      session.expiresAt <= this.now()
     )
       throw new AuthError(
         401,
         "SESSION_EXPIRED",
         "Your session has expired. Sign in again.",
       );
-    if (touch) this.activity.set(sessionHash, this.now());
     if (
       touch &&
       this.state.writable &&
-      this.now() - session.lastSeenAt > 5 * 60 * 1000 &&
+      (this.now() - session.lastSeenAt > 5 * 60 * 1000 ||
+        session.expiresAt < session.lastSeenAt + SESSION_AGE) &&
       !this.closing.has(sessionHash) &&
       !this.touches.has(sessionHash)
     ) {
@@ -335,7 +330,11 @@ export class AuthService {
           "session",
           "",
           sessionHash,
-          { ...session, lastSeenAt: this.now() },
+          {
+            ...session,
+            lastSeenAt: this.now(),
+            expiresAt: this.now() + SESSION_AGE,
+          },
           current.revision,
         )
         .catch(() => {})
@@ -345,6 +344,21 @@ export class AuthService {
       this.touches.set(sessionHash, updating);
     }
     return session;
+  }
+  async refreshSession(
+    token: string,
+  ): Promise<{ session: Session; cookie: string }> {
+    // Only extend the browser cookie after the server has confirmed the renewal.
+    await this.touches.get(hash(token));
+    const session = this.authenticate(token, false);
+    return {
+      session,
+      cookie: this.cookie(
+        this.sessionCookieName,
+        token,
+        Math.floor((session.expiresAt - this.now()) / 1000),
+      ),
+    };
   }
   validateMutation(
     session: Session,
@@ -366,7 +380,6 @@ export class AuthService {
       if (revision)
         await this.state.remove("session", "", session.hash, revision);
       this.revoked.add(hash(token));
-      this.activity.delete(session.hash);
       return this.cookie(this.sessionCookieName, "", 0);
     } finally {
       this.closing.delete(session.hash);

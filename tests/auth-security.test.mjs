@@ -4,6 +4,8 @@ import { randomBytes } from "node:crypto";
 import { AuthService, DiscordOAuth, loadAuthConfig } from "../dist/core/auth.js";
 import { memoryState } from "./fixtures/state.mjs";
 
+const YEAR = 365 * 24 * 60 * 60 * 1000;
+
 const configEnv = (origin = "https://bot.example.com") => ({
   DISCORD_CLIENT_ID: "9",
   DISCORD_CLIENT_SECRET: "fixture",
@@ -74,7 +76,7 @@ test("LAN login retains owner authorization, cookie flags and exact CSRF origin"
   assert.equal(new URL(httpsLogin.url).searchParams.get("redirect_uri"), `${httpsConfig.origin}/auth/callback`);
 });
 
-test("owner configuration, bound expiring OAuth state, session rotation and absolute expiry are enforced", async (t) => {
+test("owner configuration, expiring OAuth state, session rotation and rolling one-year expiry are enforced", async (t) => {
   const { state } = await memoryState(t);
   const env = configEnv();
   assert.throws(() =>
@@ -115,17 +117,62 @@ test("owner configuration, bound expiring OAuth state, session rotation and abso
   assert.equal(identified, 0);
   login = begin();
   const first = await auth.completeLogin("code", login, login);
+  assert.match(first.cookie, /; Max-Age=31536000; Secure$/);
+  assert.equal(first.session.expiresAt - first.session.createdAt, YEAR);
   const token = first.cookie.split(";")[0].split("=")[1];
   login = begin();
   const renewed = await auth.completeLogin("code", login, login, token);
   const active = renewed.cookie.split(";")[0].split("=")[1];
   assert.notEqual(active, token);
   assert.throws(() => auth.authenticate(token), { code: "SESSION_EXPIRED" });
-  for (let hour = 0; hour < 26; hour++) {
-    clock += 55 * 60 * 1000;
-    assert.equal(auth.authenticate(active).userId, "7");
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  clock += 11 * 60 * 1000;
+  clock += 180 * 24 * 60 * 60 * 1000;
+  assert.equal(auth.authenticate(active, false).userId, "7");
+  assert.equal(auth.authenticate(active).userId, "7");
+  const refreshed = await auth.refreshSession(active);
+  assert.match(refreshed.cookie, /; Max-Age=31536000; Secure$/);
+  assert.equal(refreshed.session.expiresAt, clock + YEAR);
+  assert.equal(state.get("session", "", refreshed.session.hash).data.expiresAt, clock + YEAR);
+  clock = renewed.session.expiresAt + 1;
+  assert.equal(auth.authenticate(active, false).userId, "7");
+  clock = refreshed.session.expiresAt;
   assert.throws(() => auth.authenticate(active), { code: "SESSION_EXPIRED" });
+});
+
+test("cookie renewal follows confirmed expiry during outages and failed writes, then recovers", async (t) => {
+  for (const failure of ["offline", "write-failed"]) {
+    await t.test(failure, async (t) => {
+      const f = await memoryState(t);
+      let clock = 1000000;
+      const config = loadAuthConfig(configEnv());
+      const oauth = {
+        authorizeURL: (state) => `https://discord.example?state=${state}`,
+        identify: async () => ({ id: "7", username: "Owner", avatar: null }),
+      };
+      const auth = new AuthService(f.state, config, oauth, () => clock);
+      await auth.initializeOwner();
+      const login = new URL(auth.beginLogin().url).searchParams.get("state");
+      const signed = await auth.completeLogin("code", login, login);
+      const token = signed.cookie.split(";")[0].split("=")[1];
+      const mutate = f.transport.mutate;
+      if (failure === "offline") f.disconnect();
+      else f.transport.mutate = async () => { throw new Error("write failed"); };
+      clock += 6 * 24 * 60 * 60 * 1000;
+      auth.authenticate(token);
+      const unchanged = await auth.refreshSession(token);
+      assert.equal(unchanged.session.expiresAt, signed.session.expiresAt);
+      assert.match(unchanged.cookie, /; Max-Age=31017600; Secure$/);
+
+      f.transport.mutate = mutate;
+      await f.recover();
+      auth.authenticate(token);
+      const renewed = await auth.refreshSession(token);
+      assert.equal(renewed.session.expiresAt, clock + YEAR);
+      assert.match(renewed.cookie, /; Max-Age=31536000; Secure$/);
+      const restarted = new AuthService(f.state, config, oauth, () => clock);
+      clock = signed.session.expiresAt + 1;
+      assert.equal(restarted.authenticate(token, false).userId, "7");
+      clock = renewed.session.expiresAt;
+      assert.throws(() => restarted.authenticate(token, false), { code: "SESSION_EXPIRED" });
+    });
+  }
 });
