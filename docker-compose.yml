@@ -17,6 +17,12 @@ services:
       state-volume-init:
         condition: service_completed_successfully
     command: ["start", "--data-dir", "/home/spacetime/.local/share/spacetime/data", "--non-interactive"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "--noproxy", "*", "--output", "/dev/null", "http://127.0.0.1:3000/v1/ping"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     volumes:
       - spacetime-data:/home/spacetime/.local/share/spacetime/data
       - spacetime-signing:/home/spacetime/.config/spacetime
@@ -56,6 +62,16 @@ services:
     volumes:
       - state-service:/run/nox-bot/service:ro
     ports: ["${NOX_BOT_DASHBOARD_BIND_ADDRESS:-127.0.0.1}:${NOX_BOT_DASHBOARD_PORT:-3200}:3200"]
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3200/health', { signal: AbortSignal.timeout(4000) }).then(response => process.exit(response.status === 200 ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     depends_on:
       state-init:
         condition: service_completed_successfully

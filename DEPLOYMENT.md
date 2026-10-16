@@ -18,6 +18,8 @@ The controlled `state-init` service creates the publisher and service identities
 
 The one-shot `state-volume-init` sets ownership and private permissions on new data/signing volumes before the DB server runs as its unprivileged user. Data and signing keys survive container recreation.
 
+The two long-running services have Docker healthchecks every 30 seconds, with a 5-second timeout and three consecutive failures before becoming unhealthy. SpacetimeDB checks its local `/v1/ping` endpoint using the `curl` already included in its base image, with a 30-second startup grace period. The bot uses its existing Node runtime to check `http://127.0.0.1:3200/health`, with a 60-second startup grace period; it is healthy only after initialization and while Discord is ready. These checks use internal container ports regardless of the host port mapping. Bot health tracks functional readiness: after initialization, a DB interruption alone does not fail it, and database synchronization is reported separately in the health response. Healthchecks report status; they do not automatically restart unhealthy containers. The two one-shot initializers retain their completion-based status.
+
 The dashboard is published in loopback by default. The database has no published port. Do not add a public DB port for the dashboard: browsers communicate only with the backend API and sanitized SSE.
 
 ### Direct LAN dashboard access
