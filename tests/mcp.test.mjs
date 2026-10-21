@@ -196,8 +196,9 @@ function success(result) {
 }
 function failure(result, code) {
   assert.equal(result.isError, true, JSON.stringify(result));
-  if (code) assert.equal(result.structuredContent.code, code);
-  return result.structuredContent;
+  const error = JSON.parse(result.content[0].text);
+  if (code) assert.equal(error.code, code);
+  return error;
 }
 
 test("guild MCP accepts JSON and default HTTP clients without requiring SSE", async (t) => {
