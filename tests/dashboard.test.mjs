@@ -8,7 +8,7 @@ import { DashboardServer } from "../dist/services/dashboard.js";
 import { memoryState } from "./fixtures/state.mjs";
 import { fakeOperations, quietLogger } from "./helpers.mjs";
 quietLogger();
-async function fixture(t, now = Date.now) {
+async function fixture(t, now = Date.now, voice) {
   const f = await memoryState(t),
     auth = new AuthService(
       f.state,
@@ -38,6 +38,7 @@ async function fixture(t, now = Date.now) {
     new QuickCommandService(f.state),
     undefined,
     new MessagingService([]),
+    undefined, undefined, undefined, voice,
   );
   await server.start();
   t.after(() => server.stop());
@@ -220,4 +221,35 @@ test("dashboard static assets use same origin, security headers and block traver
   );
   assert.match(await response.text(), /NoX Bot/);
   assert.equal((await fetch(`${f.origin}/%2e%2e%2fpackage.json`)).status, 404);
+});
+
+test("voice routes preserve owner auth, CSRF, guild boundaries and the separate text-channel contract", async t => {
+  const calls = [];
+  const voice = {
+    async channels(guildId) { calls.push(["channels", guildId]); return [{ id: "10", name: "Voice" }]; },
+    async status(guildId) { calls.push(["status", guildId]); return { configured: false, state: "inactive" }; },
+    async diagnostics(guildId) { calls.push(["diagnostics", guildId]); return { controller: "ready" }; },
+    async applySettings(guildId, settings) { calls.push(["settings", guildId, settings]); return settings; },
+    async action(guildId, action) { calls.push(["action", guildId, action]); return { state: "starting" }; },
+  };
+  const f = await fixture(t, Date.now, voice), base = "/dashboard/api/guilds/1/voice";
+  assert.equal((await fetch(`${f.origin}${base}/status`)).status, 401);
+  assert.equal((await f.call("/dashboard/api/guilds/2/voice/status")).status, 404);
+  assert.equal((await f.call(`${base}/engine/start`, "POST", {}, { Origin: "https://attacker.example" })).status, 403);
+  assert.deepEqual(calls, []);
+  assert.equal((await f.call(`${base}/channels`)).status, 200);
+  assert.equal((await f.call(`${base}/status`)).status, 200);
+  assert.equal((await f.call(`${base}/diagnostics`)).status, 200);
+  assert.equal((await f.call(`${base}/engine/start`, "POST", {})).status, 202);
+  const settings = { voice: "NATF0", prompt: "Hello", bits: 4 };
+  assert.equal((await f.call(`${base}/settings`, "PUT", settings)).status, 200);
+  const count = calls.length;
+  assert.equal((await f.call(`${base}/settings`, "PUT", { ...settings, controllerUrl: "https://attacker.example" })).status, 400);
+  assert.equal((await f.call(`${base}/engine/start`, "GET")).status, 405);
+  assert.equal(calls.length, count);
+  const text = await f.call("/dashboard/api/guilds/1/channels");
+  assert.equal(text.status, 200); assert.ok(!(await text.json()).some(channel => channel.id === "10"));
+  f.disconnect();
+  assert.equal((await f.call(`${base}/status`)).status, 200);
+  assert.equal((await f.call(`${base}/engine/stop`, "POST", {})).status, 503);
 });

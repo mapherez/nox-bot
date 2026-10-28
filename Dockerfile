@@ -30,5 +30,8 @@ COPY --from=build --chown=nox:nox /app/web/dist ./web/dist
 COPY --from=build --chown=nox:nox /app/spacetimedb/dist ./spacetimedb/dist
 COPY --from=build --chown=nox:nox /app/scripts ./scripts
 USER nox
+# Fail the build on either target architecture if native voice dependencies cannot load.
+# Audio is converted in-process; FFmpeg is not used.
+RUN node --input-type=module -e 'import opus from "@discordjs/opus"; import { generateDependencyReport } from "@discordjs/voice"; const codec = new opus.OpusEncoder(48000, 2); if (codec.decode(codec.encode(Buffer.alloc(3840))).length !== 3840 || !/@snazzah\/davey: 0\./.test(generateDependencyReport())) process.exit(1);'
 EXPOSE 3200
 CMD ["node", "dist/index.js"]

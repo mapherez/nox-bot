@@ -14,6 +14,7 @@ export default class Bot {
   constructor(
     intents = [
       GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildVoiceStates,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
     ],

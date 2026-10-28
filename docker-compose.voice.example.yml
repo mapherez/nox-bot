@@ -1,0 +1,24 @@
+# Optional: copy this file to docker-compose.override.yml once, alongside docker-compose.yml.
+# Normal operation remains: docker compose up -d
+# Only these three existing files are mounted; no Google/session secrets or server/CA private keys.
+services:
+  nox-bot:
+    volumes:
+      - type: bind
+        source: ${NOX_VOICE_SECRETS_DIR:-./secrets}/ca.crt
+        target: /run/nox-voice/ca.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${NOX_VOICE_SECRETS_DIR:-./secrets}/client.crt
+        target: /run/nox-voice/client.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${NOX_VOICE_SECRETS_DIR:-./secrets}/client.key
+        target: /run/nox-voice/client.key
+        read_only: true
+        bind:
+          create_host_path: false

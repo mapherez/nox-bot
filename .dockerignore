@@ -19,3 +19,11 @@ prefix-commands.json
 output
 web/dist
 spacetimedb/dist
+
+# Local voice credentials and dependency/test caches are never image inputs.
+secrets
+.cache
+*.key
+*.crt
+*.pem
+docker-compose.override.yml

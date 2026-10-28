@@ -150,4 +150,29 @@ export const builtInPlugins: readonly PluginDefinition[] = [
     validateSettings: noSettings,
     validateSecrets: noSecrets,
   },
+  {
+    id: "voice",
+    name: "NoX Voice",
+    description:
+      "Voice conversations through nox-voice-mlx in a Discord voice channel.",
+    version: "1.0.0",
+    icon: "activity",
+    runtimeEntry: "./voice/runtime.js",
+    dashboardEntry: "voice",
+    capabilities: ["voice"],
+    commands: [],
+    defaults: { channelId: "" },
+    secretFields: [],
+    validateSettings(value) {
+      const data = plainSettings(value);
+      if (
+        Object.keys(data).some((key) => key !== "channelId") ||
+        typeof data.channelId !== "string" ||
+        (data.channelId !== "" && !/^\d{1,20}$/.test(data.channelId))
+      )
+        throw new Error("Select a valid voice channel.");
+      return { channelId: data.channelId };
+    },
+    validateSecrets: noSecrets,
+  },
 ];

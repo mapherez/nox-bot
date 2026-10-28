@@ -109,3 +109,7 @@ spacetimedb/dist/
 output/
 !web/public/
 !web/public/nox.svg
+
+# Local optional voice deployment and credentials
+secrets/
+docker-compose.override.yml

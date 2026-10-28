@@ -17,6 +17,9 @@ import {
   resolveRuntimeVersion,
 } from "../utils/runtimeVersion.js";
 import Logger from "../utils/logger.js";
+import { VoiceController } from "../voice/controller.js";
+import { VoiceService } from "../voice/service.js";
+import { DiscordVoice } from "../voice/discord.js";
 import Bot from "./bot.js";
 import DiscordOperations from "./discordOperations.js";
 import ControlApi from "./controlApi.js";
@@ -68,6 +71,16 @@ export class Runtime implements ManagedRuntime {
     )
       throw new Error("Invalid dashboard listener configuration.");
     const vault = new SecretVault(env.NOX_BOT_ENCRYPTION_KEY ?? "");
+    let voiceController: VoiceController | undefined,
+      voiceError: string | undefined;
+    try {
+      voiceController = await VoiceController.fromEnvironment(env);
+    } catch (error) {
+      voiceError =
+        error instanceof Error
+          ? error.message
+          : "NoX Voice configuration is invalid.";
+    }
     const info = createServiceInfo(await resolveRuntimeVersion(env));
     return new Runtime(
       env,
@@ -79,6 +92,7 @@ export class Runtime implements ManagedRuntime {
       { host, port },
       processState,
       fatal,
+      { controller: voiceController, error: voiceError },
     );
   }
   private constructor(
@@ -91,6 +105,7 @@ export class Runtime implements ManagedRuntime {
     listener: { host: string; port: number },
     processState: () => ProcessState,
     fatal: (error: unknown) => void,
+    voiceConfig: { controller?: VoiceController; error?: string },
   ) {
     this.bot = new Bot();
     const operations = new DiscordOperations(this.bot.client),
@@ -102,6 +117,12 @@ export class Runtime implements ManagedRuntime {
       builtInPlugins,
       () => new Set(this.bot.client.guilds.cache.keys()),
     );
+    const voice = new VoiceService(
+      voiceConfig.controller,
+      new DiscordVoice(this.bot.client),
+      voiceConfig.error,
+    );
+    this.plugins.attachVoice(voice);
     const quick = new QuickCommandService(this.state),
       registry = new CommandRegistry(this.plugins);
     this.auth = new AuthService(
@@ -137,6 +158,7 @@ export class Runtime implements ManagedRuntime {
       registry,
       info,
       processState,
+      voice,
     );
     if (apiConfig.enabled)
       this.api = new ControlApi(

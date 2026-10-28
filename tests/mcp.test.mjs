@@ -423,7 +423,7 @@ test("plugin management reuses validation and workers without executing plugins;
     executions++;
     return execute(...args);
   };
-  assert.equal(success(await f.call("plugin_list")).plugins.length, 4);
+  assert.equal(success(await f.call("plugin_list")).plugins.length, 5);
   assert.deepEqual(
     success(await f.call("command_list")).commands.map((c) => c.name),
     ["nox"],

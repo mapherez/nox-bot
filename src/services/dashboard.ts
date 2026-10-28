@@ -18,6 +18,8 @@ import {
 import type { PluginManager } from "../plugins/manager.js";
 import type { QuickCommandService } from "../core/quickCommands.js";
 import type { GuildSnapshot } from "../shared/dashboard.js";
+import type { VoiceService } from "../voice/service.js";
+import { VoiceError } from "../voice/errors.js";
 import Logger from "../utils/logger.js";
 import { createServiceInfo } from "../utils/runtimeVersion.js";
 import { CommandRegistry } from "../core/commandRegistry.js";
@@ -120,6 +122,7 @@ export class DashboardServer {
     registry: CommandRegistry = new CommandRegistry(plugins),
     info: ServiceInfo = createServiceInfo("dev"),
     processState: () => ProcessState = () => "running",
+    private readonly voice?: VoiceService,
   ) {
     this.guilds = new GuildConfigurationService(
       state,
@@ -295,6 +298,55 @@ export class DashboardServer {
               "STATE_UNAVAILABLE",
               "Reconnecting — configuration changes temporarily unavailable",
             );
+          const voiceRoute =
+            /^voice\/(channels|status|diagnostics|settings|engine\/(?:start|stop|restart))$/.exec(
+              resource,
+            );
+          if (voiceRoute) {
+            if (!this.voice)
+              throw new VoiceError("NoX Voice is not configured.", 503);
+            const route = voiceRoute[1];
+            if (
+              method === "GET" &&
+              ["channels", "status", "diagnostics"].includes(route)
+            ) {
+              const result =
+                route === "channels"
+                  ? await this.voice.channels(guildId)
+                  : route === "status"
+                    ? await this.voice.status(guildId)
+                    : await this.voice.diagnostics(guildId);
+              json(response, 200, result);
+              return;
+            }
+            if (method === "PUT" && route === "settings") {
+              const input = await body(request);
+              shape(input, ["voice", "prompt", "bits"]);
+              json(
+                response,
+                200,
+                await this.voice.applySettings(guildId, input),
+              );
+              return;
+            }
+            if (method === "POST" && route.startsWith("engine/")) {
+              shape(await body(request), []);
+              json(
+                response,
+                202,
+                await this.voice.action(
+                  guildId,
+                  route.slice(7) as "start" | "stop" | "restart",
+                ),
+              );
+              return;
+            }
+            throw new AuthError(
+              405,
+              "METHOD_NOT_ALLOWED",
+              "Method not allowed.",
+            );
+          }
           const plugin =
             /^plugins\/([a-z][a-z0-9-]{0,31})\/(enabled|settings)$/.exec(
               resource,
@@ -424,7 +476,12 @@ export class DashboardServer {
         response.end();
         return;
       }
-      if (error instanceof AuthError)
+      if (error instanceof VoiceError)
+        json(response, error.status, {
+          code: "VOICE_UNAVAILABLE",
+          message: error.message,
+        });
+      else if (error instanceof AuthError)
         json(response, error.status, {
           code: error.code,
           message: error.message,

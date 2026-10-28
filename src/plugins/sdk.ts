@@ -2,7 +2,7 @@ import type { APIApplicationCommandOption, APIEmbed } from "discord.js";
 import type { Settings } from "../core/state.js";
 
 export type Capability =
-  "http" | "attachments" | "discord-users" | "interactive";
+  "http" | "attachments" | "discord-users" | "interactive" | "voice";
 export interface PluginCommand {
   name: string;
   description: string;

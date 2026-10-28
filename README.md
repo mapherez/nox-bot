@@ -97,3 +97,7 @@ External changes to perform separately:
 - Register the exact HTTPS `/auth/callback` URL and provide the OAuth client secret/owner ID.
 
 The existing workflow supports ARM64 and AMD64; implementation does not execute that publishing workflow, publish images, create tags/releases or change remote resources. LLMs, marketplace, external plugins, multiple tokens, billing and public registration are outside scope.
+
+## Discord voice conversations
+
+The optional [NoX Voice plugin](docs/VOICE.md) connects [nox-voice-mlx](https://github.com/mapherez/nox-voice-mlx) to a shared Discord voice channel. Configure the channel and voice settings in the plugin drawer, then enable manually once the service is ready. The standard text bot works without this optional integration.

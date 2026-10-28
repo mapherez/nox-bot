@@ -1,6 +1,8 @@
 import type { PluginCard, Settings } from "../../../src/shared/dashboard";
 export interface PluginPanelProps {
   plugin: PluginCard;
+  guildId: string;
+  csrf: string;
   writable: boolean;
   saving: boolean;
   error: string;

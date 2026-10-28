@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { validateId } from "../controlApi.js";
 import {
   isRecord,
+  StateError,
   type GuildPlugin,
   type Settings,
   type StateStore,
@@ -18,11 +19,16 @@ import type {
   PluginDefinition,
   RichContent,
 } from "./sdk.js";
+import type { VoiceService } from "../voice/service.js";
 import Logger from "../utils/logger.js";
 import { validateRichContent } from "./richContent.js";
 
 export type RuntimeState =
-  "inactive" | "starting" | "active" | "error" | "stopping";
+  | "inactive"
+  | "starting"
+  | "active"
+  | "error"
+  | "stopping";
 type Reply = Extract<ChildMessage, { type: "result" }>["value"];
 type Request = ParentMessage extends infer M
   ? M extends ParentMessage
@@ -146,6 +152,8 @@ export class PluginManager extends EventEmitter {
   private readonly plugins = new Map<string, ManagedPlugin>();
   private serial = Promise.resolve();
   private stopping = false;
+  private voice?: VoiceService;
+  private voiceMutation: Promise<unknown> = Promise.resolve();
   private detach: () => void;
   constructor(
     private readonly state: StateStore,
@@ -166,7 +174,8 @@ export class PluginManager extends EventEmitter {
         !definition.icon ||
         !definition.dashboardEntry ||
         !/^\.\/[a-z0-9-]+\/runtime\.js$/.test(definition.runtimeEntry) ||
-        definition.commands.length === 0 ||
+        (definition.commands.length === 0 &&
+          !definition.capabilities.includes("voice")) ||
         typeof definition.validateSettings !== "function" ||
         typeof definition.validateSecrets !== "function"
       )
@@ -174,9 +183,13 @@ export class PluginManager extends EventEmitter {
       if (
         definition.capabilities.some(
           (value) =>
-            !["http", "attachments", "discord-users", "interactive"].includes(
-              value,
-            ),
+            ![
+              "http",
+              "attachments",
+              "discord-users",
+              "interactive",
+              "voice",
+            ].includes(value),
         ) ||
         new Set(definition.secretFields).size !== definition.secretFields.length
       )
@@ -238,6 +251,10 @@ export class PluginManager extends EventEmitter {
     }
     this.detach = state.addProjection(() => this.synchronize());
   }
+  attachVoice(voice: VoiceService): void {
+    this.voice = voice;
+    voice.on("change", () => this.emit("change"));
+  }
   definitions(): PluginDefinition[] {
     return [...this.plugins.values()].map((p) => p.definition);
   }
@@ -247,6 +264,7 @@ export class PluginManager extends EventEmitter {
     return plugin.definition;
   }
   isActive(id: string, guildId: string): boolean {
+    if (id === "voice") return this.voice?.isActive(guildId) ?? false;
     const plugin = this.plugins.get(id);
     return !!plugin && plugin.status === "active" && plugin.guilds.has(guildId);
   }
@@ -259,6 +277,13 @@ export class PluginManager extends EventEmitter {
     );
   }
   runtimeStatus(id: string) {
+    if (id === "voice")
+      return {
+        state: this.voice?.runtimeStatus().state ?? "inactive",
+        pid: undefined,
+        guildCount: this.voice?.runtimeStatus().guildCount ?? 0,
+        error: this.voice?.runtimeStatus().error,
+      };
     const plugin = this.plugins.get(id);
     return {
       state: plugin?.status ?? "inactive",
@@ -272,7 +297,10 @@ export class PluginManager extends EventEmitter {
       stored = this.state.get("plugin", guildId, id);
     return {
       revision: stored?.revision ?? "0",
-      enabled: stored?.data.enabled ?? false,
+      enabled:
+        id === "voice"
+          ? (this.voice?.isActive(guildId) ?? false)
+          : (stored?.data.enabled ?? false),
       settings: stored?.data.settings ?? structuredClone(definition.defaults),
       secrets: Object.fromEntries(
         definition.secretFields.map((field) => [
@@ -281,10 +309,15 @@ export class PluginManager extends EventEmitter {
         ]),
       ),
       runtime:
-        stored?.data.enabled && this.installedGuilds().has(guildId)
+        id === "voice"
           ? this.runtimeStatus(id).state
-          : "inactive",
-      error: stored?.data.enabled ? this.runtimeStatus(id).error : undefined,
+          : stored?.data.enabled && this.installedGuilds().has(guildId)
+            ? this.runtimeStatus(id).state
+            : "inactive",
+      error:
+        id === "voice" || stored?.data.enabled
+          ? this.runtimeStatus(id).error
+          : undefined,
     };
   }
   private decrypt(
@@ -331,11 +364,29 @@ export class PluginManager extends EventEmitter {
       settings: definition.validateSettings(input.settings),
       secrets,
     };
+    if (id === "voice" && this.voice)
+      await this.voice.validateChannel(guildId, config.settings);
     if (config.enabled)
       definition.validateSecrets(this.decrypt(definition, config));
     await this.state.put("plugin", guildId, id, config, input.expectedRevision);
   }
-  async setEnabled(
+  setEnabled(
+    id: string,
+    guildId: string,
+    enabled: boolean,
+    expectedRevision: string,
+  ): Promise<void> {
+    if (id !== "voice")
+      return this.setEnabledNow(id, guildId, enabled, expectedRevision);
+    // Keep the enable handshake and its confirmed write together. A competing stale
+    // toggle must not disconnect a conversation successfully enabled by an earlier request.
+    const work = this.voiceMutation.then(() =>
+      this.setEnabledNow(id, guildId, enabled, expectedRevision),
+    );
+    this.voiceMutation = work.catch(() => {});
+    return work;
+  }
+  private async setEnabledNow(
     id: string,
     guildId: string,
     enabled: boolean,
@@ -356,6 +407,31 @@ export class PluginManager extends EventEmitter {
       secrets: { ...previous?.secrets },
     };
     if (enabled) definition.validateSecrets(this.decrypt(definition, config));
+    if (id === "voice") {
+      if (!this.voice) throw new Error("NoX Voice service is unavailable.");
+      if (!this.state.writable)
+        throw new StateError(
+          "STATE_UNAVAILABLE",
+          "Configuration changes are temporarily unavailable.",
+        );
+      if (
+        (this.state.get("plugin", guildId, id)?.revision ?? "0") !==
+        expectedRevision
+      )
+        throw new StateError(
+          "STATE_CONFLICT",
+          "Configuration changed. Refresh and try again.",
+        );
+      if (enabled) await this.voice.enable(guildId, config.settings);
+      else await this.voice.disable(guildId);
+      try {
+        await this.state.put("plugin", guildId, id, config, expectedRevision);
+      } catch (error) {
+        if (enabled) await this.voice.disable(guildId);
+        throw error;
+      }
+      return;
+    }
     await this.state.put("plugin", guildId, id, config, expectedRevision);
   }
   synchronize(): Promise<void> {
@@ -367,6 +443,28 @@ export class PluginManager extends EventEmitter {
     if (this.stopping) return;
     const installed = this.installedGuilds();
     for (const plugin of this.plugins.values()) {
+      if (plugin.definition.capabilities.includes("voice")) {
+        if (this.voice) {
+          try {
+            await this.voice.synchronize(
+              new Map(
+                this.state
+                  .list("plugin")
+                  .filter(
+                    (row) =>
+                      row.data.pluginId === plugin.definition.id &&
+                      row.data.enabled &&
+                      installed.has(row.data.guildId),
+                  )
+                  .map((row) => [row.data.guildId, row.data.settings]),
+              ),
+            );
+          } catch {
+            this.voice.abort();
+          }
+        }
+        continue;
+      }
       const desired = new Set(
         this.state
           .list("plugin")
@@ -533,6 +631,7 @@ export class PluginManager extends EventEmitter {
   async close(): Promise<void> {
     this.stopping = true;
     this.detach();
+    await this.voice?.close();
     for (const plugin of this.plugins.values()) clearTimeout(plugin.retry);
     await this.serial;
     await Promise.all(
@@ -548,6 +647,7 @@ export class PluginManager extends EventEmitter {
   forceClose(): void {
     this.stopping = true;
     this.detach();
+    this.voice?.forceClose();
     for (const plugin of this.plugins.values()) {
       clearTimeout(plugin.retry);
       plugin.process?.forceStop();

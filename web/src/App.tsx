@@ -918,7 +918,11 @@ export default function App() {
                   !writable || saving || (editing.type === "plugin" && !dirty)
                 }
               >
-                {saving ? "Saving…" : "Save changes"}
+                {saving
+                  ? "Saving…"
+                  : editing.type === "plugin" && editing.plugin.id === "voice"
+                    ? "Apply changes (new conversation)"
+                    : "Save changes"}
               </button>
             )
           }
@@ -930,6 +934,8 @@ export default function App() {
               >
                 <Panel
                   plugin={editing.plugin}
+                  guildId={guildId}
+                  csrf={session!.csrf}
                   writable={writable}
                   saving={saving}
                   error={error}
