@@ -10,6 +10,7 @@ import type {
 } from "../../src/shared/dashboard";
 import { ApiError, request } from "./api";
 import { Badge, Drawer, Notice, Switch } from "./components";
+import QuickCommandBackup from "./QuickCommandBackup";
 import { panels } from "./pluginCatalog";
 import s from "./App.module.css";
 type Page = "Server" | "Plugins" | "Quick Commands";
@@ -499,24 +500,47 @@ export default function App() {
               </p>
             </div>
             {page === "Quick Commands" && (
-              <button
-                className={s.primary}
-                disabled={!writable}
-                onClick={() =>
-                  open({
-                    type: "quick",
-                    fresh: true,
-                    command: {
-                      trigger: "",
-                      response: "",
-                      enabled: true,
-                      revision: "0",
-                    },
-                  })
-                }
-              >
-                + Add command
-              </button>
+              <div className={s.quickTools}>
+                <button
+                  className={s.primary}
+                  disabled={!writable}
+                  onClick={() =>
+                    open({
+                      type: "quick",
+                      fresh: true,
+                      command: {
+                        trigger: "",
+                        response: "",
+                        enabled: true,
+                        revision: "0",
+                      },
+                    })
+                  }
+                >
+                  + Add command
+                </button>
+                {snapshot && (
+                  <QuickCommandBackup
+                    key={guildId}
+                    guildId={guildId}
+                    serverName={server?.name ?? "this server"}
+                    csrf={session.csrf}
+                    commands={snapshot.quickCommands}
+                    writable={writable}
+                    saving={saving}
+                    onImported={(value) => {
+                      if (selected.current === value.guildId)
+                        setSnapshot(value);
+                    }}
+                    onNotice={(value) => {
+                      if (selected.current === guildId) setNotice(value);
+                    }}
+                    onError={(value) => {
+                      if (selected.current === guildId) setError(value);
+                    }}
+                  />
+                )}
+              </div>
             )}
           </div>
           {!writable && (

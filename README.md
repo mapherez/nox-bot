@@ -101,3 +101,17 @@ The existing workflow supports ARM64 and AMD64; implementation does not execute 
 ## Discord voice conversations
 
 The optional [NoX Voice plugin](docs/VOICE.md) connects [nox-voice-mlx](https://github.com/mapherez/nox-voice-mlx) to a shared Discord voice channel. Configure the channel and voice settings in the plugin drawer, then enable manually once the service is ready. The standard text bot works without this optional integration.
+
+### Quick Commands backups
+
+On **Quick Commands**, open the vertical three-dot menu beside **Add command**. **Export commands** downloads the complete list as JSON, including disabled commands and the exact saved responses. **Import commands** opens a JSON file and shows a preview before saving: matching triggers are updated, new triggers are added, and commands absent from the backup are kept. Responses and enabled/disabled states are restored from the file.
+
+Backups contain only `trigger`, `response` and `enabled`, so they can be restored after a database migration or into another server. The format is a JSON array:
+
+```json
+[
+  { "trigger": "rules", "response": "Read the server rules.", "enabled": true }
+]
+```
+
+Files are validated completely before writing. Imports are limited to 16 MiB per request; large lists use batches of at most 1000 changes to respect the existing database transaction limit. If a connection failure interrupts multiple batches, the error reports the number already confirmed; refresh the list and choose the backup again before retrying. Concurrent edits are protected by revision checks. Export remains available from the last confirmed list during a database outage; import requires synchronization.

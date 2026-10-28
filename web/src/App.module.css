@@ -1218,3 +1218,49 @@
   overflow-wrap: anywhere;
   font-size: 0.8rem;
 }
+
+.quickTools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.quickBackup {
+  position: relative;
+}
+.backupTrigger {
+  width: 44px;
+  padding: 0;
+}
+.backupMenu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 10;
+  min-width: 12rem;
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  box-shadow: 0 12px 28px #0006;
+}
+.backupMenu button {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  min-height: 44px;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  font-size: 0.8rem;
+}
+.backupMenu button:hover:not(:disabled),
+.backupMenu button:focus-visible {
+  background: #292938;
+}
+.backupFilename {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}

@@ -1,4 +1,6 @@
 import { validateId } from "../controlApi.js";
+import { parseQuickCommandBackup } from "../shared/quickCommandBackup.js";
+import { StateError } from "./state.js";
 import type { QuickCommand, StateStore } from "./state.js";
 export class QuickCommandService {
   constructor(private readonly state: StateStore) {}
@@ -15,6 +17,98 @@ export class QuickCommandService {
       trigger.toLowerCase(),
     )?.data;
     return command?.enabled ? command.response : undefined;
+  }
+  export(guildId: string) {
+    validateId(guildId);
+    if (!this.state.initialized)
+      throw new StateError(
+        "STATE_UNAVAILABLE",
+        "Wait for confirmed commands before exporting.",
+      );
+    return this.list(guildId).map(
+      ({ data: { trigger, response, enabled } }) => ({
+        trigger,
+        response,
+        enabled,
+      }),
+    );
+  }
+  async import(
+    guildId: string,
+    value: unknown,
+    expectedRevisions: unknown,
+  ): Promise<number> {
+    validateId(guildId);
+    if (!this.state.writable)
+      throw new StateError(
+        "STATE_UNAVAILABLE",
+        "Wait for synchronization before importing commands.",
+      );
+    let commands;
+    try {
+      commands = parseQuickCommandBackup(value, guildId);
+    } catch (cause) {
+      throw new StateError("INVALID_STATE", (cause as Error).message);
+    }
+    if (
+      !expectedRevisions ||
+      typeof expectedRevisions !== "object" ||
+      Array.isArray(expectedRevisions)
+    )
+      throw new StateError(
+        "INVALID_STATE",
+        "Expected command revisions are required.",
+      );
+    const revisions = expectedRevisions as Record<string, unknown>;
+    if (Object.keys(revisions).length !== commands.length)
+      throw new StateError(
+        "INVALID_STATE",
+        "Expected revisions must match the imported commands.",
+      );
+    // Validate the ENTIRE backup and its revision expectations before the first write.
+    const changes = commands.map((command) => {
+      const revision = Object.prototype.hasOwnProperty.call(
+        revisions,
+        command.trigger,
+      )
+        ? revisions[command.trigger]
+        : undefined;
+      if (typeof revision !== "string" || !/^\d+$/.test(revision))
+        throw new StateError("INVALID_STATE", "Invalid command revision.");
+      if (
+        (this.state.get("quick", guildId, command.trigger)?.revision ?? "0") !==
+        revision
+      )
+        throw new StateError(
+          "STATE_CONFLICT",
+          "Commands changed after the import preview. Choose the file again to review the latest commands.",
+        );
+      return this.state.change(
+        "quick",
+        guildId,
+        command.trigger,
+        { guildId, ...command },
+        revision,
+      );
+    });
+    let confirmed = 0;
+    try {
+      // Respect the existing reducer's 1000-change transaction limit, including large backups.
+      for (let offset = 0; offset < changes.length; offset += 1000) {
+        const batch = changes.slice(offset, offset + 1000);
+        await this.state.commit(batch);
+        confirmed += batch.length;
+      }
+    } catch (cause) {
+      if (!confirmed) throw cause;
+      const code =
+        cause instanceof StateError ? cause.code : "WRITE_UNCONFIRMED";
+      throw new StateError(
+        code,
+        `${confirmed} of ${commands.length} commands were confirmed before import stopped. Refresh the list before trying again; the last batch may have an unknown result.`,
+      );
+    }
+    return confirmed;
   }
   async save(
     guildId: string,

@@ -18,6 +18,7 @@ import {
 import type { PluginManager } from "../plugins/manager.js";
 import type { QuickCommandService } from "../core/quickCommands.js";
 import type { GuildSnapshot } from "../shared/dashboard.js";
+import { QUICK_COMMAND_BACKUP_MAX_BYTES } from "../shared/quickCommandBackup.js";
 import type { VoiceService } from "../voice/service.js";
 import { VoiceError } from "../voice/errors.js";
 import Logger from "../utils/logger.js";
@@ -51,6 +52,7 @@ function json(response: ServerResponse, status: number, body: unknown): void {
 }
 async function body(
   request: IncomingMessage,
+  maxBytes = 65536,
 ): Promise<Record<string, unknown>> {
   if (!request.headers["content-type"]?.startsWith("application/json"))
     throw new AuthError(415, "INVALID_PAYLOAD", "Use application/json.");
@@ -58,7 +60,7 @@ async function body(
   let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > 65536)
+    if (size > maxBytes)
       throw new AuthError(
         413,
         "PAYLOAD_TOO_LARGE",
@@ -389,6 +391,25 @@ export class DashboardServer {
                 expectedRevision: revision(input.expectedRevision),
               });
             }
+            json(response, 200, this.snapshot(guildId));
+            return;
+          }
+          if (resource === "quick-commands/export" && method === "GET") {
+            response.setHeader(
+              "Content-Disposition",
+              `attachment; filename="nox-quick-commands-${guildId}.json"`,
+            );
+            json(response, 200, this.quick.export(guildId));
+            return;
+          }
+          if (resource === "quick-commands/import" && method === "POST") {
+            const input = await body(request, QUICK_COMMAND_BACKUP_MAX_BYTES);
+            shape(input, ["commands", "expectedRevisions"]);
+            await this.quick.import(
+              guildId,
+              input.commands,
+              input.expectedRevisions,
+            );
             json(response, 200, this.snapshot(guildId));
             return;
           }
