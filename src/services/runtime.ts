@@ -5,10 +5,7 @@ import { SecretVault } from "../core/secrets.js";
 import { MessagingService } from "../core/messaging.js";
 import { QuickCommandService } from "../core/quickCommands.js";
 import { CommandRegistry } from "../core/commandRegistry.js";
-import {
-  SpacetimeTransport,
-  loadSpacetimeConfig,
-} from "../storage/spacetime.js";
+import { SqliteTransport, loadSqliteConfig } from "../storage/sqlite.js";
 import { PluginManager } from "../plugins/manager.js";
 import { builtInPlugins } from "../plugins/catalog.js";
 import { loadControlApiConfig, type ProcessState } from "../controlApi.js";
@@ -59,7 +56,7 @@ export class Runtime implements ManagedRuntime {
     fatal: (error: unknown) => void,
   ): Promise<Runtime> {
     const authConfig = loadAuthConfig(env),
-      storage = await loadSpacetimeConfig(env),
+      storage = loadSqliteConfig(env),
       apiConfig = loadControlApiConfig(env);
     const port = Number(env.NOX_BOT_DASHBOARD_PORT ?? 3200),
       host = env.NOX_BOT_DASHBOARD_HOST ?? "127.0.0.1";
@@ -98,7 +95,7 @@ export class Runtime implements ManagedRuntime {
   private constructor(
     private readonly env: NodeJS.ProcessEnv,
     authConfig: ReturnType<typeof loadAuthConfig>,
-    storage: Awaited<ReturnType<typeof loadSpacetimeConfig>>,
+    storage: Awaited<ReturnType<typeof loadSqliteConfig>>,
     apiConfig: ReturnType<typeof loadControlApiConfig>,
     vault: SecretVault,
     info: ReturnType<typeof createServiceInfo>,
@@ -110,7 +107,7 @@ export class Runtime implements ManagedRuntime {
     this.bot = new Bot();
     const operations = new DiscordOperations(this.bot.client),
       messaging = new MessagingService([operations]);
-    this.state = new StateStore(new SpacetimeTransport(storage));
+    this.state = new StateStore(new SqliteTransport(storage));
     this.plugins = new PluginManager(
       this.state,
       vault,

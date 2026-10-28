@@ -8,8 +8,8 @@ import DiscordOperations from '../../dist/services/discordOperations.js';
 import ControlApi from '../../dist/services/controlApi.js';
 import { loadControlApiConfig } from '../../dist/controlApi.js';
 import { createServiceInfo } from '../../dist/utils/runtimeVersion.js';
-import { DbConnection } from '../../dist/storage/bindings/index.js';
-assert.equal(typeof DbConnection.builder, 'function');
+import { DatabaseSync } from 'node:sqlite';
+const sqlite = new DatabaseSync(':memory:'); assert.equal(sqlite.prepare('SELECT 1 AS ready').get().ready, 1); sqlite.close();
 const Native = createRequire(import.meta.url)('nodehun').Nodehun;
 const dictionary = new Native(await readFile('/app/dist/assets/dictionaries/portuguese/pt_PT.aff'), await readFile('/app/dist/assets/dictionaries/portuguese/pt_PT.dic'));
 assert.equal(await dictionary.spell('coração'), true);
@@ -21,4 +21,4 @@ const app = new Application({ DISCORD_TOKEN: `MT${'x'.repeat(60)}`, DISCORD_CLIE
 await app.start(); assert.equal(app.getState(), 'running');
 if (enabled) { const url = `http://127.0.0.1:${api.address().port}`; assert.equal((await fetch(`${url}/v1/health`)).status, 503); assert.equal((await fetch(`${url}/v1/status`)).status, 401); assert.equal((await (await fetch(`${url}/v1/info`)).json()).service, 'nox-bot'); } else assert.equal(api, undefined);
 process.emit('SIGTERM'); await app.stop(); await new Promise(resolve => setImmediate(resolve)); assert.equal(exited, 0); assert.equal(bot.client.listenerCount('messageCreate'), 0); if (api) assert.equal(api.address(), null);
-console.log(`Docker smoke passed: ${process.arch}, API ${enabled ? 'enabled' : 'disabled'}, native Dictionary and SDK loaded.`);
+console.log(`Docker smoke passed: ${process.arch}, API ${enabled ? 'enabled' : 'disabled'}, native Dictionary and SQLite loaded.`);

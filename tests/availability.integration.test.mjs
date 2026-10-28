@@ -1,11 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, fork } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fork } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { provisionState } from "../scripts/provision-state.mjs";
-import { StateStore } from "../dist/core/state.js";
-import { SpacetimeTransport } from "../dist/storage/spacetime.js";
 import { SecretVault } from "../dist/core/secrets.js";
 import { PluginManager } from "../dist/plugins/manager.js";
 import { builtInPlugins } from "../dist/plugins/catalog.js";
@@ -14,38 +10,15 @@ import { CommandRegistry } from "../dist/core/commandRegistry.js";
 import { CommandReconciler } from "../dist/services/commandReconciler.js";
 import { MessagingService } from "../dist/core/messaging.js";
 import { AuthService } from "../dist/core/auth.js";
-const url = process.env.NOX_BOT_TEST_STATE_URL,
-  container = process.env.NOX_BOT_TEST_STATE_CONTAINER;
-// Voice is hosted by Core with explicit activation, not by the recoverable text workers.
-const workerPlugins = builtInPlugins.filter(
-  (plugin) => !plugin.capabilities.includes("voice"),
-);
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-async function until(predicate, timeout = 10000) {
-  const deadline = Date.now() + timeout;
-  while (!predicate()) {
-    if (Date.now() > deadline)
-      throw new Error("Integration condition timed out.");
-    await delay(20);
-  }
-}
+import { sqliteFixture, untilSqlite } from "./fixtures/sqlite.mjs";
+import { quietLogger } from "./helpers.mjs";
+quietLogger();
 test(
-  "real DB outage preserves all workers, Quick Commands, sessions, messaging and reconciliation; cold start awaits recovery",
-  { skip: !url || !container, timeout: 60000 },
+  "real SQLite worker recovery preserves text workers, sessions, Quick Commands and reconciliation without a DB server",
+  { timeout: 30000 },
   async (t) => {
-    if (!/^nox-bot-test-[a-f0-9]{8}$/.test(container))
-      throw new Error("Only a disposable test container may be interrupted.");
-    const database =
-        process.env.NOX_BOT_TEST_STATE_DATABASE ?? "nox-bot-integration",
-      credentialFile = process.env.NOX_BOT_TEST_STATE_CREDENTIAL_FILE;
-    const { token } = await provisionState({
-      url,
-      database,
-      credentialFile,
-      bundle: "spacetimedb/dist/bundle.js",
-    });
-    const transport = new SpacetimeTransport({ url, database, token }),
-      state = new StateStore(transport),
+    const f = await sqliteFixture(t, 30),
+      { state, transport } = f,
       guildId = "987654321";
     const launcher = (entry, args, options) =>
       fork(entry, args, {
@@ -61,31 +34,29 @@ test(
       () => new Set([guildId]),
       launcher,
     );
-    t.after(async () => {
-      await plugins.close();
-      await state.close();
-    });
+    f.beforeClose(() => plugins.close());
     await state.start();
     await plugins.configure("weather", guildId, {
       settings: { units: "celsius", defaultLocation: "London" },
       secrets: { apiKey: "fixture-key" },
       expectedRevision: "0",
     });
-    for (const plugin of workerPlugins)
+    const workers = builtInPlugins.filter(
+      (plugin) => !plugin.capabilities.includes("voice"),
+    );
+    for (const plugin of workers)
       await plugins.setEnabled(
         plugin.id,
         guildId,
         true,
         plugins.configuration(plugin.id, guildId).revision,
       );
-    for (const plugin of workerPlugins)
-      assert.equal(
-        plugins.isActive(plugin.id, guildId),
-        true,
-        `${plugin.id}: ${JSON.stringify(plugins.runtimeStatus(plugin.id))}`,
-      );
-    assert.equal(plugins.configuration("voice", guildId).enabled, false);
-    assert.equal(plugins.runtimeStatus("voice").pid, undefined);
+    const pids = Object.fromEntries(
+      workers.map((plugin) => [
+        plugin.id,
+        plugins.runtimeStatus(plugin.id).pid,
+      ]),
+    );
     const quick = new QuickCommandService(state);
     await quick.save(
       guildId,
@@ -108,34 +79,35 @@ test(
     );
     await auth.initializeOwner();
     const login = auth.beginLogin(),
-      nonce = new URL(login.url).searchParams.get("state"),
-      signed = await auth.completeLogin("code", nonce, nonce),
-      sessionToken = signed.cookie.split(";")[0].split("=")[1];
-    const pids = Object.fromEntries(
-      workerPlugins.map((plugin) => [
-        plugin.id,
-        plugins.runtimeStatus(plugin.id).pid,
-      ]),
-    );
-    const stop = () =>
-        execFileSync("docker", ["stop", "-t", "1", container], {
-          stdio: "ignore",
-        }),
-      start = () =>
-        execFileSync("docker", ["start", container], { stdio: "ignore" });
-    t.after(() => {
-      try {
-        start();
-      } catch {}
+      nonce = new URL(login.url).searchParams.get("state");
+    const signed = await auth.completeLogin("code", nonce, nonce),
+      token = signed.cookie.split(";")[0].split("=")[1];
+    let hold = true,
+      release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
     });
-    stop();
-    await until(() => !state.writable);
+    state.addProjection(async () => {
+      if (hold) await gate;
+    });
+    f.beforeClose(() => {
+      hold = false;
+      release();
+    });
+    await transport.worker.terminate();
+    assert.equal(state.writable, false);
     assert.equal(state.initialized, true);
-    assert.equal(plugins.configuration("voice", guildId).enabled, false);
     assert.equal(quick.response(guildId, "hello"), "Public response");
-    assert.equal(auth.authenticate(sessionToken).userId, "7");
+    assert.equal(auth.authenticate(token).userId, "7");
+    assert.equal(plugins.configuration("voice", guildId).enabled, false);
     assert.throws(() => auth.beginLogin(), { code: "STATE_UNAVAILABLE" });
-    const user = {
+    await assert.rejects(
+      quick.delete(guildId, "hello", quick.list(guildId)[0].revision),
+      { code: "STATE_UNAVAILABLE" },
+    );
+    const context = {
+      guildId,
+      user: {
         id: "7",
         username: "Tester",
         avatarURL: "https://example.com/avatar.png",
@@ -143,16 +115,13 @@ test(
         joinedTimestamp: 200,
         roles: [],
       },
-      context = {
-        guildId,
-        user,
-        options: {},
-        users: {},
-        latencyMs: 42,
-        command: "",
-      };
+      options: {},
+      users: {},
+      latencyMs: 42,
+      command: "",
+    };
     const results = {};
-    for (const plugin of workerPlugins)
+    for (const plugin of workers)
       results[plugin.id] = await plugins.execute(
         plugin.id,
         plugin.commands[0].handler,
@@ -166,21 +135,8 @@ test(
     assert.equal(results.dictionary.attachments.length, 1);
     assert.match(results.ping.content, /Pong/);
     assert.ok(results.userinfo.embeds.length);
-    for (const plugin of workerPlugins)
+    for (const plugin of workers)
       assert.equal(plugins.runtimeStatus(plugin.id).pid, pids[plugin.id]);
-    await assert.rejects(
-      plugins.setEnabled(
-        "ping",
-        guildId,
-        false,
-        plugins.configuration("ping", guildId).revision,
-      ),
-      { code: "STATE_UNAVAILABLE" },
-    );
-    await assert.rejects(
-      quick.delete(guildId, "hello", quick.list(guildId)[0].revision),
-      { code: "STATE_UNAVAILABLE" },
-    );
     const sent = [],
       messaging = new MessagingService([
         {
@@ -201,82 +157,43 @@ test(
       { content: quick.response(guildId, "hello") },
     );
     assert.deepEqual(sent, ["Public response"]);
-    let actual = [],
-      writes = 0;
-    const registry = new CommandRegistry(plugins),
-      reconciler = new CommandReconciler("9", registry, {
-        get: async () => actual,
-        post: async (route, { body }) => {
-          actual.push({ ...body, id: String(++writes) });
-        },
-        patch: async () => {
-          writes++;
-        },
-        delete: async () => {
-          writes++;
-        },
-      });
+    const actual = [],
+      registry = new CommandRegistry(plugins);
+    let writes = 0;
+    const reconciler = new CommandReconciler("9", registry, {
+      get: async () => actual,
+      post: async (_route, { body }) =>
+        actual.push({ ...body, id: String(++writes) }),
+      patch: async () => {
+        writes++;
+      },
+      delete: async () => {
+        writes++;
+      },
+    });
     await reconciler.reconcile(guildId);
     assert.equal(
       actual.length,
-      1 +
-        workerPlugins.reduce(
-          (count, plugin) => count + plugin.commands.length,
-          0,
-        ),
+      1 + workers.reduce((count, plugin) => count + plugin.commands.length, 0),
     );
     const count = writes;
     await reconciler.reconcile(guildId);
     assert.equal(writes, count);
     await reconciler.close();
-    const cold = new StateStore(
-      new SpacetimeTransport({ url, database, token }),
-    );
-    t.after(() => cold.close());
-    const waiting = cold.start();
-    await delay(200);
-    assert.equal(cold.initialized, false);
-    assert.equal(cold.writable, false);
-    start();
-    await until(() => cold.initialized);
-    await waiting;
-    await until(() => state.writable);
-    assert.equal(plugins.configuration("voice", guildId).enabled, false);
-    assert.equal(quick.response(guildId, "hello"), "Public response");
+    // A fresh process can open the same durable file without waiting for another DB container.
+    const cold = f.create();
+    await cold.state.start();
     assert.equal(
-      cold.get("quick", guildId, "hello").data.response,
+      cold.state.get("quick", guildId, "hello").data.response,
       "Public response",
     );
-    // Lose reducer confirmation deliberately; the application never retries the mutation.
-    const connection = transport.connection,
-      original = connection.reducers.mutateState.bind(connection.reducers);
-    let attempts = 0;
-    connection.reducers.mutateState = (args) => {
-      attempts++;
-      const write = original(args);
-      connection.disconnect();
-      return write;
-    };
-    await assert.rejects(
-      quick.save(
-        guildId,
-        {
-          guildId,
-          trigger: "uncertain",
-          response: "Committed only if the server received it",
-          enabled: true,
-        },
-        "0",
-      ),
-      { code: "WRITE_UNCONFIRMED" },
-    );
-    assert.equal(quick.response(guildId, "uncertain"), undefined);
-    await until(() => state.writable);
-    assert.equal(attempts, 1);
-    const recovered = quick.response(guildId, "uncertain");
-    assert.ok(
-      recovered === undefined ||
-        recovered === "Committed only if the server received it",
-    );
+    await cold.state.close();
+    hold = false;
+    release();
+    await untilSqlite(() => state.writable);
+    for (const plugin of workers)
+      assert.equal(plugins.runtimeStatus(plugin.id).pid, pids[plugin.id]);
+    assert.equal(plugins.configuration("voice", guildId).enabled, false);
+    assert.equal(auth.authenticate(token).userId, "7");
   },
 );

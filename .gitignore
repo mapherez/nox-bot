@@ -103,7 +103,6 @@ Thumbs.db
 # Add any project-specific files you want to ignore
 # NoX Bot local verification artifacts
 .tmp/
-spacetimedb/dist/
 
 .playwright-cli/
 output/
@@ -113,3 +112,12 @@ output/
 # Local optional voice deployment and credentials
 secrets/
 docker-compose.override.yml
+
+# Local SQLite data and backup files
+data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+compose.override.yaml
+compose.override.yml

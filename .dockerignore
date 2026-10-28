@@ -18,7 +18,6 @@ prefix-commands.json
 .playwright-cli
 output
 web/dist
-spacetimedb/dist
 
 # Local voice credentials and dependency/test caches are never image inputs.
 secrets
@@ -27,3 +26,18 @@ secrets
 *.crt
 *.pem
 docker-compose.override.yml
+
+# Local SQLite data and backup files
+data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+compose.override.yaml
+compose.override.yml
+
+# Exclude database files even when a custom path is under a copied source directory.
+**/*.sqlite
+**/*.sqlite-*
+**/*.db
+**/*.db-*

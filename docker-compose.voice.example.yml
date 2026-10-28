@@ -1,4 +1,5 @@
-# Optional: copy this file to docker-compose.override.yml once, alongside docker-compose.yml.
+# Optional: copy to docker-compose.override.yml beside docker-compose.yml.
+# If the main file is compose.yaml, use compose.override.yaml instead.
 # Normal operation remains: docker compose up -d
 # Only these three existing files are mounted; no Google/session secrets or server/CA private keys.
 services:

@@ -26,13 +26,8 @@ export function legacyPlan(
     validateEntity("quick", value);
     return value;
   });
-  if (
-    new Set(quick.map((command) => command.trigger)).size !== quick.length ||
-    quick.length > 990
-  )
-    throw new Error(
-      "Legacy Quick Commands contain duplicate triggers or exceed the import limit.",
-    );
+  if (new Set(quick.map((command) => command.trigger)).size !== quick.length)
+    throw new Error("Legacy Quick Commands contain duplicate triggers.");
   if (weatherKey)
     builtInPlugins
       .find((plugin) => plugin.id === "weather")!
@@ -74,7 +69,9 @@ export async function importLegacy(
         {
           guildId: plan.guildId,
           pluginId: plugin.id,
-          enabled: plugin.id !== "weather" || !!plan.weatherKey,
+          enabled:
+            !plugin.capabilities.includes("voice") &&
+            (plugin.id !== "weather" || !!plan.weatherKey),
           settings: plugin.defaults,
           secrets:
             plugin.id === "weather" && plan.weatherKey

@@ -4,9 +4,9 @@ import { legacyPlan, importLegacy } from "../dist/core/migration.js";
 import { StateStore } from "../dist/core/state.js";
 import { SecretVault } from "../dist/core/secrets.js";
 import {
-  SpacetimeTransport,
-  loadSpacetimeConfig,
-} from "../dist/storage/spacetime.js";
+  SqliteTransport,
+  loadSqliteConfig,
+} from "../dist/storage/sqlite.js";
 const args = process.argv.slice(2),
   fields = {};
 for (let index = 0; index < args.length; index++) {
@@ -57,7 +57,7 @@ else {
   if (!guild.ok)
     throw new Error("The destination server could not be verified in Discord.");
   const state = new StateStore(
-    new SpacetimeTransport(await loadSpacetimeConfig(process.env)),
+    new SqliteTransport(loadSqliteConfig(process.env)),
   );
   const deadline = setTimeout(() => {
     void state.close();

@@ -1,4 +1,4 @@
-// Pure validation shared by the backend and database module.
+// Pure validation shared by the backend, browser backup parser and SQLite worker.
 const kinds = ["guild", "plugin", "quick", "user", "session", "migration"];
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);

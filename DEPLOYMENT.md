@@ -1,97 +1,78 @@
 # NoX Bot deployment
 
-The same Compose stack supports `linux/amd64` and `linux/arm64`, with no primary hardware platform. Node 24 runs the bot and dashboard. SpacetimeDB 2.10.2 runs on the same host with private networking and persistent data/signing-key volumes.
+The image supports `linux/amd64` and `linux/arm64`. Node 24.22.1 runs the bot/dashboard and includes SQLite. The Compose stack contains one application service with one persistent data volume. The schema is created automatically; there is no separate database service or initializer.
 
-## Prepare
+## Prepare and run
 
-1. Copy `.env.example` to `.env` and set the bot token, application ID, OAuth secret, explicit owner ID, public HTTPS origin and two separate base64 keys.
-2. Register `https://YOUR_HOST/auth/callback` in Discord Developer Portal. Enable Message Content intent if using Quick Commands.
-3. Configure the existing HTTPS proxy to `127.0.0.1:3200`. Proxy `/auth/*`, `/dashboard/api/*` and assets on the same origin. Disable buffering for SSE and allow long-lived event streams. The application determines Secure cookies from `NOX_BOT_PUBLIC_URL`, rather than trusting arbitrary forwarded headers.
+1. Copy `.env.example` to `.env`. Configure the Discord bot token, application ID, OAuth secret, explicit owner ID, browser origin and the two separate base64 keys.
+2. Register the exact origin's `/auth/callback` in Discord Developer Portal. Enable Message Content intent for Quick Commands.
+3. Keep `NOX_BOT_DATABASE_PATH=./data/nox-bot.sqlite`. Inside the image, the working directory is `/app`, so this resolves to `/app/data/nox-bot.sqlite`, inside the `bot-data` volume.
+4. Use the published image or build it with the existing GitHub workflow. Start the deployment:
 
 ```sh
-docker compose build
 docker compose up -d
-docker compose logs --tail 100 nox-bot state-init
+docker compose logs --tail 100 nox-bot
 ```
 
-The controlled `state-init` service creates the publisher and service identities, publishes the module and authorizes only the service through an owner-checked reducer. The application mounts only service credentials read-only; it cannot authorize arbitrary clients. The publisher volume is mounted only by the initializer. Module updates use migration preflight and never request deletion of database state.
+The default publication is `127.0.0.1:3200`. An existing HTTPS proxy/tunnel can forward to this listener. Keep assets, `/auth/`, `/dashboard/api/` and `/mcp/` on the configured origin. Disable proxy buffering for SSE and allow long-lived responses.
 
-The one-shot `state-volume-init` sets ownership and private permissions on new data/signing volumes before the DB server runs as its unprivileged user. Data and signing keys survive container recreation.
+The image runs as UID/GID **10001**. `/app/data` is prepared with that owner and mode 0700 at image build time; Docker preserves this when initializing a new named volume. SQLite creates its file with mode 0600. The application does not use a privileged runtime bootstrap or change host ownership/permissions. A custom bind-mounted data directory must already be writable by UID/GID 10001.
 
-The two long-running services have Docker healthchecks every 30 seconds, with a 5-second timeout and three consecutive failures before becoming unhealthy. SpacetimeDB checks its local `/v1/ping` endpoint using the `curl` already included in its base image, with a 30-second startup grace period. The bot uses its existing Node runtime to check `http://127.0.0.1:3200/health`, with a 60-second startup grace period; it is healthy only after initialization and while Discord is ready. These checks use internal container ports regardless of the host port mapping. Bot health tracks functional readiness: after initialization, a DB interruption alone does not fail it, and database synchronization is reported separately in the health response. Healthchecks report status; they do not automatically restart unhealthy containers. The two one-shot initializers retain their completion-based status.
+## SQLite storage
 
-The dashboard is published in loopback by default. The database has no published port. Do not add a public DB port for the dashboard: browsers communicate only with the backend API and sanitized SSE.
+The database persists Quick Commands, plugin configuration, encrypted plugin secrets, owner authorization, sessions and legacy import markers. Keep `NOX_BOT_ENCRYPTION_KEY` and `NOX_BOT_SESSION_SECRET` in the deployment environment as before. No DB URL, DB token or DB identity files are needed.
 
-### Direct LAN dashboard access
+`NOX_BOT_DATABASE_PATH` is the file path **inside the application environment**, not a host directory. The default works both in the container (`/app/data/nox-bot.sqlite`) and during local development (`data/nox-bot.sqlite` relative to the repo). Changing the container path requires mounting its parent directory persistently as well. The standard setup requires no additional path variable.
 
-To use the dashboard from other LAN machines, set the host's private LAN IP as the Compose publication address and use that exact browser origin. For example, in the deployment `.env`:
+SQLite uses WAL and FULL synchronization in a dedicated worker thread. The complete validated Quick Commands import is a single transaction, including lists over 1000 commands. Dashboard updates still travel over the application's existing SSE endpoint. Run one bot instance per database file and keep the volume on local storage rather than a network filesystem.
 
-```dotenv
-NOX_BOT_DASHBOARD_BIND_ADDRESS=192.168.1.50
-NOX_BOT_PUBLIC_URL=http://192.168.1.50:3200
-```
+## Existing deployments
 
-Replace the example IP with your host's actual LAN address and register `http://192.168.1.50:3200/auth/callback` with the matching address in Discord Developer Portal. Recreate the bot container after changing these values. Compose retains `0.0.0.0` inside the container; `NOX_BOT_DASHBOARD_BIND_ADDRESS` controls only the host interface. For a process running outside Docker, set `NOX_BOT_DASHBOARD_HOST` to the LAN address as well.
+Follow [SQLite migration](docs/SQLITE-MIGRATION.md) for the removed services, volumes and environment variables. The transition starts with a new SQLite database and restores Quick Commands using the exported JSON. It does not read or convert the old database automatically.
 
-HTTP origins allow localhost, loopback addresses, IPv4 private ranges (`10/8`, `172.16/12`, `192.168/16`) and IPv6 unique local addresses (`fc00::/7`). Other HTTP hostnames and public IPs are rejected; use HTTPS for them. HTTP LAN cookies remain HttpOnly and SameSite=Lax but travel without TLS. Owner-only authorization, session expiry and exact Origin/CSRF validation still apply. HTTPS retains Secure cookies. The default loopback publication and existing HTTPS proxy setup remain available.
+## Direct LAN dashboard access
+
+Set `NOX_BOT_DASHBOARD_BIND_ADDRESS` to the desired host interface and `NOX_BOT_PUBLIC_URL` to the exact browser origin, including the chosen host port. Register that origin's `/auth/callback` with Discord. Compose keeps the internal listener at `0.0.0.0:3200`; the host mapping is independent.
+
+HTTP accepts localhost/loopback, private IPv4 addresses and IPv6 unique-local addresses. HTTPS accepts a hostname. HTTPS cookies are Secure; HTTP LAN cookies retain HttpOnly and SameSite=Lax. Owner authorization and exact Origin/CSRF validation apply in both cases.
+
+## Optional voice integration
+
+Follow [NoX Voice](docs/VOICE.md). The optional override mounts only the existing three client certificate files for the nox-voice-mlx controller. It is independent of the SQLite data volume. Keep the configured HTTPS controller URL and client-file environment variables unchanged during this storage migration.
+
+If your main file is `docker-compose.yml`, use `docker-compose.override.yml`. If it is `compose.yaml`, use `compose.override.yaml`. Matching default override names are loaded automatically by `docker compose up -d`.
 
 ## Optional Control API
 
-Provide an independent `NOX_BOT_API_KEY` and enable the existing override:
+Provide the independent `NOX_BOT_API_KEY` and enable the existing explicit override:
 
 ```sh
 docker compose -f docker-compose.yml -f docker-compose.api.yml up -d
 ```
 
-The Control API publishes only a loopback port by default. `/v1` bearer authentication, validation and error contracts are preserved. It uses the same live Discord client and permissions as the dashboard and bot.
-
-## Migration
-
-Run the explicit import script with a mandatory guild ID and old JSON path after initialization. Use dry run first; consult the main README. No JSON file is mounted into the application, and the legacy Weather key is only read when explicitly selected by the importer.
+When using explicit `-f` arguments, include the voice override as another `-f` if required; automatic override discovery is replaced by the supplied list. The Control API keeps its bearer authentication, routes and loopback port publication.
 
 ## Backups and shutdown
 
-Back up the `spacetime-data`, `spacetime-signing`, `state-publisher` and `state-service` volumes together with the external encryption/session keys and deployment secrets. Signing keys must persist so saved identity tokens remain valid. Treat credential volumes as secrets. Take consistent DB backups while the service is stopped or using the server's supported backup facilities.
+Use **Quick Commands → ⋮ → Export commands** for a portable JSON backup. To back up all application data, stop the bot and snapshot/copy the entire `bot-data` volume, retaining the external encryption/session keys separately. SQLite can have `-wal`/`-shm` files while open; copying only the main `.sqlite` file during writes is not a complete backup.
 
 ```sh
-docker compose stop
-docker compose start
+docker compose stop nox-bot
+# Back up the bot-data volume using the host's volume/snapshot tooling.
+docker compose start nox-bot
 ```
 
-The bot stops accepting HTTP work, closes SSE, disposes plugin processes and disconnects Discord. Its internal deadline is ten seconds; Compose grants fifteen seconds. Plugin dispose has a timeout followed by forced termination. A DB interruption after initialization keeps the last confirmed runtime operational. A cold start awaits a confirmed snapshot.
+Container recreation and image updates retain the named volume. The bot drains HTTP work, closes SSE, disposes plugins, closes SQLite and disconnects Discord on shutdown. Its internal deadline is ten seconds and Compose allows fifteen seconds.
 
-## Existing image workflow
+The existing healthcheck uses the Node runtime every 30 seconds with a 5-second timeout, three retries and a 60-second startup grace period. Functional readiness and storage synchronization are reported separately. A storage-worker failure after startup preserves cached command functionality while recovery is attempted; a cold start requires the database to open successfully. Healthchecks report status and do not themselves restart unhealthy containers.
 
-The existing manual GitHub workflow builds `linux/arm64,linux/amd64` for `ghcr.io/mapherez/nox-bot`. Compose and the workflow's image-tag input default to `latest`; set `NOX_BOT_IMAGE_TAG` to select another existing image tag. Image tags are independent of the application's runtime version. Do not run the publishing workflow merely to validate locally. Configure Discord branding and the OAuth callback separately in Developer Portal.
-
-## SpacetimeDB on ARM64 hosts with 16 KB pages
-
-The previous official SpacetimeDB image can fail before startup on a 16 KB kernel with `jemalloc: Unsupported system page size`. The controlled initializer then times out because no DB becomes available. This requires a compatible DB binary, not a longer initialization timeout.
-
-`Build SpacetimeDB image` is a separate, manual GitHub Action. Run it from `main` after committing the recipe. It builds and tests native AMD64 and ARM64 images before publishing `ghcr.io/mapherez/nox-spacetimedb:2.10.2-pages64k`. Both server and CLI remain version 2.10.2, from the pinned upstream commit. Only ARM64 receives `JEMALLOC_SYS_WITH_LG_PAGE=16`; AMD64 retains upstream allocator defaults. Functional contracts remain the same, but ARM64 memory use and performance can differ.
-
-The action verifies versions, build metadata, runtime layout, the real DB integration cases and Compose persistence before publishing each architecture by digest. It verifies the merged manifest against those digests and publishes `latest`, the version tag and a recipe-commit tag. Compose, the bot toolchain and DB tools use `ghcr.io/mapherez/nox-spacetimedb:latest`. The summary reports that reference and its current manifest digest. Publishing does not change package visibility: first review the manifest/digests, then make the `nox-spacetimedb` package public manually once in GitHub Packages. No extra registry credentials are required for public pulls. Run the updated action once to create `latest` if an earlier publication only created version tags.
-
-### Validate a published candidate on the 16 KB host
-
-The custom image is the deployment default. Compatibility with a 16 KB kernel still requires a smoke on that actual host; the GitHub runners do not establish this. First confirm `getconf PAGESIZE` returns `16384` and pull `latest`:
+## Build and validation
 
 ```sh
-export NOX_BOT_SPACETIMEDB_IMAGE=ghcr.io/mapherez/nox-spacetimedb:latest
-docker pull "$NOX_BOT_SPACETIMEDB_IMAGE"
 npm ci
-node scripts/test-spacetime-image.mjs arm64
 npm run typecheck
 npm test
 npm run test:state
-docker buildx build --builder default --platform linux/arm64 --build-arg "NOX_BOT_SPACETIMEDB_IMAGE=$NOX_BOT_SPACETIMEDB_IMAGE" --load -t nox-bot:validation-arm64 .
-node scripts/test-compose.mjs arm64
 ```
 
-These harnesses never load deployment `.env`, log into Discord or mount production volumes. The DB integration test uses a disposable container and private fixture credentials; Compose uses a unique project with temporary named volumes, preserving the official image for `state-volume-init`. The tests exercise module publication, authenticated subscriptions/writes, outage recovery and persistence after server recreation. Native build tooling for `nodehun` is required as described in the README. The test output reports the container kernel page size and an end-of-test DB memory sample; record these with the exit status and observation period. The sample is not a performance comparison. Passing a 4 KB runner does not establish compatibility with a 16 KB host.
-
-### Deploy and update
-
-Before using existing data, take a consistent backup and record the currently installed image digest for rollback. No reference replacement is required: the `spacetimedb` service, the bot Dockerfile's toolchain argument and the DB tools all default to `latest`. Keep `state-volume-init` and the runtime base in the custom image recipe on the original official digest; they intentionally retain those references.
-
-Run the normal checks and the existing bot image workflow to rebuild/publish the bot with the custom toolchain. On the deployment host, pull `spacetimedb`, `state-init` and `nox-bot`, then run `docker compose up -d` without `--build`; check DB and initializer logs. Preserve every existing volume, credential mount and private network. Never use `docker compose down --volumes` for this rollout. No storage migration is needed for the same SpacetimeDB version. Later successful custom image publications update `latest`; an explicit pull and container recreation apply that update on the host.
+`npm test` includes the real SQLite integration cases without Docker. CI also builds and smoke-tests the production image and fresh named-volume persistence for AMD64 and ARM64. The manual image workflow retains its existing GHCR name and tagging behaviour. Local validation does not publish images or modify the deployed bot.

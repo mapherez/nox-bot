@@ -12,7 +12,7 @@ The control API is an optional machine-readable interface for external clients, 
 | `NOX_BOT_API_KEY` | unset | Required when enabled; no whitespace; must differ from the Discord token, including its normalized form. |
 | `NOX_BOT_VERSION` | unset | Optional runtime application-version override. |
 
-Discord uses `DISCORD_TOKEN` and `DISCORD_CLIENT_ID`. Guild selection comes from the real client; plugin settings and encrypted secrets are stored per guild in SpacetimeDB and managed through the dashboard's Plugins page. Quick Commands are managed on their own dashboard page. Guild command registrations reconcile automatically at startup, relevant configuration changes, guild installation and Discord recovery; no manual refresh is needed. The Control API does not read the legacy Weather key or command JSON.
+Discord uses `DISCORD_TOKEN` and `DISCORD_CLIENT_ID`. Guild selection comes from the real client; plugin settings and encrypted secrets are stored per guild in SQLite and managed through the dashboard's Plugins page. Quick Commands are managed on their own dashboard page. Guild command registrations reconcile automatically at startup, relevant configuration changes, guild installation and Discord recovery; no manual refresh is needed. The Control API does not read the legacy Weather key or command JSON.
 
 Generate a separate random key:
 
@@ -62,7 +62,7 @@ Returns HTTP 200 only after initialization completes and Discord is ready. Other
 
 Health reads local state without REST requests. The listener remains available through reconnections and readiness returns automatically when Discord recovers. During shutdown the listener closes, so clients may observe a connection failure rather than a final health response.
 
-The dashboard listener's `GET /health` separately exposes database synchronization and functional readiness. A cold process waits for a confirmed SpacetimeDB snapshot before completing initialization. After initialization, a DB interruption preserves the last confirmed runtime, including messaging and command reconciliation. Persistent configuration changes and new dashboard sessions remain blocked until synchronization recovers; existing confirmed sessions remain usable within their expiry limits.
+The dashboard listener's `GET /health` separately exposes database synchronization and functional readiness. A cold process waits for a committed SQLite snapshot before completing initialization. After initialization, a DB interruption preserves the last confirmed runtime, including messaging and command reconciliation. Persistent configuration changes and new dashboard sessions remain blocked until synchronization recovers; existing confirmed sessions remain usable within their expiry limits.
 
 ### GET /v1/info — public
 
@@ -176,18 +176,18 @@ The application resolves one version at startup: nonblank `NOX_BOT_VERSION`, the
 
 The Docker workflow fetches history/tags and uses `git describe --tags --exact-match HEAD` for an exact tag (including that command's selection when several tags coexist). Otherwise it uses `git-<full HEAD SHA>`. The build receives `NOX_BOT_BUILD_VERSION`; no manual application-version workflow input exists. The Docker image-tag input defaults to `latest` and remains independent of this runtime version. To supply metadata to a local build, set `NOX_BOT_BUILD_VERSION` when running `npm run build`, or use the Docker build argument with the same name.
 
-The base Compose runs the bot/dashboard, private SpacetimeDB and one-shot volume/bootstrap initializers. It publishes the dashboard at `127.0.0.1:${NOX_BOT_DASHBOARD_PORT:-3200}` by default; set `NOX_BOT_DASHBOARD_BIND_ADDRESS` to the host's private LAN IP for direct LAN access. The DB has no published port. Both application services use `ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-latest}`. See [deployment](../DEPLOYMENT.md) for provisioning, persistent volumes, LAN dashboard access and the existing HTTPS proxy setup. For local Control API access, configure its separate `NOX_BOT_API_KEY` in `.env` and run:
+The base Compose runs one bot/dashboard container with a persistent SQLite data volume. It publishes the dashboard at `127.0.0.1:${NOX_BOT_DASHBOARD_PORT:-3200}` by default; set `NOX_BOT_DASHBOARD_BIND_ADDRESS` to the host's private LAN IP for direct LAN access. SQLite has no server or published port. The application service uses `ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-latest}`. See [deployment](../DEPLOYMENT.md) for automatic initialization, the persistent data volume, LAN dashboard access and the existing HTTPS proxy setup. For local Control API access, configure its separate `NOX_BOT_API_KEY` in `.env` and run:
 
 ```sh
 docker compose -f docker-compose.yml -f docker-compose.api.yml up -d
 ```
 
-The override enables the Control API with `NOX_BOT_API_ENABLED`, binds to `0.0.0.0` inside the container, publishes only `127.0.0.1:${NOX_BOT_API_PORT:-3100}` on the host, and allows 15 seconds for shutdown. Quick Commands and plugin settings use SpacetimeDB; there is no runtime command-JSON mount. To expose access beyond the host, explicitly change publication and use your chosen private network/tunnel or HTTPS proxy. The image supports `linux/amd64` and `linux/arm64`, including native `nodehun` on both architectures.
+The override enables the Control API with `NOX_BOT_API_ENABLED`, binds to `0.0.0.0` inside the container, publishes only `127.0.0.1:${NOX_BOT_API_PORT:-3100}` on the host, and allows 15 seconds for shutdown. Quick Commands and plugin settings use SQLite; there is no runtime command-JSON mount. To expose access beyond the host, explicitly change publication and use your chosen private network/tunnel or HTTPS proxy. The image supports `linux/amd64` and `linux/arm64`, including native `nodehun` on both architectures.
 
 SIGINT/SIGTERM and fatal failures share bounded cleanup: stop new HTTP work, drain accepted operations, close SSE and DB subscriptions, dispose plugin workers and destroy the existing Client. Startup cannot continue after shutdown. Normal cleanup is idempotent with a total 10-second deadline.
 
 ## Validation
 
-Run `npm run typecheck`, `npm test` and `npm run test:state`. The suite builds the backend/dashboard and tests contracts over local HTTP, Discord operations with fake managers and real local permission objects, version resolution, logging, reconciliation, commands and lifecycle. The state harness builds the module and runs real self-hosted SpacetimeDB integration checks, including outage/recovery. These checks do not load deployment `.env` or log into Discord. CI uses Node 24 and runs before image publication. See [validation](validation.md) for the existing multiarchitecture Docker/Compose checks.
+Run `npm run typecheck`, `npm test` and `npm run test:state`. The suite builds the backend/dashboard and tests contracts over local HTTP, Discord operations with fake managers and real local permission objects, version resolution, logging, reconciliation, commands and lifecycle. The state subset uses real SQLite files and verifies restart persistence, atomic transactions and worker recovery without Docker. These checks do not load deployment `.env` or log into Discord. CI uses Node 24.22.1 and runs before image publication. See [validation](validation.md) for the existing multiarchitecture Docker/Compose checks.
 
 For live acceptance in a development guild, enable Ping through the dashboard and check `/ping`, an enabled Quick Command, automatic guild command reconciliation, API channel selection, a successful message, denied-channel handling, readiness after reconnection, and `docker compose stop`. These checks require an explicitly configured live Discord deployment and are separate from the offline suite.

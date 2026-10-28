@@ -1,10 +1,10 @@
 # NoX Bot repository guidance
 
-Use Node 24 and strict TypeScript. Backend ESM imports use explicit `.js` extensions.
+Use Node 24.22.1 or newer within Node 24 and strict TypeScript. Backend ESM imports use explicit `.js` extensions.
 
 - `src/services/runtime.ts` composes one Discord client, storage projection, plugin supervisor, reconciler, dashboard and optional Control API.
-- `src/core/state.ts` holds only subscription-confirmed state. DB disconnection preserves the last confirmed runtime and blocks persistent mutations/new sessions. Never add optimistic runtime state, a write queue or file fallback.
-- `spacetimedb/src/index.ts` uses private tables, service-identity views and guarded reducers. Keep server/CLI/SDK pinned together and regenerate bindings with `npm run db:generate`.
+- `src/core/state.ts` holds only transaction-confirmed state. DB disconnection preserves the last confirmed runtime and blocks persistent mutations/new sessions. Never add optimistic runtime state, a write queue or file fallback.
+- `src/storage/sqlite.ts` is the only storage backend. `sqliteWorker.ts` uses Node's built-in SQLite in a dedicated worker, WAL/FULL transactions and per-record revision checks. Publish state only after COMMIT. Use the persistent data volume; no external DB server, credentials, module build or generated bindings are required.
 - `src/plugins/catalog.ts` is the built-in catalog. Each plugin owns typed runtime handlers/lifecycle and a lazy React panel in `web/src/plugins/`. Validate definitions and capabilities before activation; use one isolated child process per plugin shared across enabled guilds.
 - `src/core/commandRegistry.ts` supplies top-level plugin commands and Core `/nox` help/commands/guildid. `src/services/commandReconciler.ts` owns incremental guild registrations. Do not restore global runtime registrations, file loaders or manual refresh commands.
 - `src/core/quickCommands.ts` stores guild-scoped Quick Commands. Input cleanup failure must not prevent the public response. Plugin interactions and follow-ups stay ephemeral; interactive context is owner/guild/plugin/expiry bound.

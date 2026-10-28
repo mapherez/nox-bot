@@ -127,7 +127,7 @@ test("import rejects stale or missing revisions without overwriting confirmed co
   });
   assert.equal(quick.response("1", "hello"), "Original");
 });
-test("large complete backups respect the database transaction limit and report partial confirmation on interruption", async (t) => {
+test("large complete backups use one transaction and a failed commit never imports a partial list", async (t) => {
   const commands = Array.from({ length: 1001 }, (_, index) => ({
     trigger: `q${index}`,
     response: `Answer ${index}`,
@@ -145,22 +145,16 @@ test("large complete backups respect the database transaction limit and report p
     await quick.import("1", commands, revisions(quick, "1", commands)),
     1001,
   );
-  assert.deepEqual(batches, [1000, 1]);
+  assert.deepEqual(batches, [1001]);
   assert.equal(quick.export("1").length, 1001);
   const interrupted = await memoryState(t),
     partial = new QuickCommandService(interrupted.state);
-  const commit = interrupted.transport.mutate.bind(interrupted.transport);
-  let calls = 0;
-  interrupted.transport.mutate = async (changes) => {
-    if (++calls === 2)
-      throw new StateError("STATE_UNAVAILABLE", "Disconnected");
-    await commit(changes);
+  interrupted.transport.mutate = async () => {
+    throw new StateError("STATE_UNAVAILABLE", "Disconnected");
   };
   await assert.rejects(
     partial.import("1", commands, revisions(partial, "1", commands)),
-    (error) =>
-      error.code === "STATE_UNAVAILABLE" &&
-      /1000 of 1001 commands were confirmed/.test(error.message),
+    { code: "STATE_UNAVAILABLE" },
   );
-  assert.equal(partial.export("1").length, 1000);
+  assert.deepEqual(partial.export("1"), []);
 });

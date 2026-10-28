@@ -91,25 +91,11 @@ export class QuickCommandService {
         revision,
       );
     });
-    let confirmed = 0;
-    try {
-      // Respect the existing reducer's 1000-change transaction limit, including large backups.
-      for (let offset = 0; offset < changes.length; offset += 1000) {
-        const batch = changes.slice(offset, offset + 1000);
-        await this.state.commit(batch);
-        confirmed += batch.length;
-      }
-    } catch (cause) {
-      if (!confirmed) throw cause;
-      const code =
-        cause instanceof StateError ? cause.code : "WRITE_UNCONFIRMED";
-      throw new StateError(
-        code,
-        `${confirmed} of ${commands.length} commands were confirmed before import stopped. Refresh the list before trying again; the last batch may have an unknown result.`,
-      );
-    }
-    return confirmed;
+    // SQLite commits the complete validated import in one atomic transaction.
+    if (changes.length) await this.state.commit(changes);
+    return changes.length;
   }
+
   async save(
     guildId: string,
     input: QuickCommand,
