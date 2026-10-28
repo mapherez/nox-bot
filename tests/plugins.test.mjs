@@ -324,3 +324,40 @@ test("logout waits for an in-flight session activity refresh and still invalidat
   assert.equal(f.state.get("session", "", session.hash), undefined);
   assert.throws(() => auth.authenticate(token), { code: "SESSION_EXPIRED" });
 });
+
+test("all text workers start with voice unconfigured and reject voice activation without disrupting commands", async (t) => {
+  const f = await fixture(t);
+  await f.manager.configure("weather", "1", {
+    settings: { units: "celsius", defaultLocation: "London" },
+    secrets: { apiKey: "fixture-key" },
+    expectedRevision: "0",
+  });
+  const workers = builtInPlugins.filter(
+    (plugin) => !plugin.capabilities.includes("voice"),
+  );
+  for (const plugin of workers) {
+    await f.manager.setEnabled(
+      plugin.id,
+      "1",
+      true,
+      f.manager.configuration(plugin.id, "1").revision,
+    );
+    assert.equal(f.manager.isActive(plugin.id, "1"), true);
+    assert.equal(typeof f.manager.runtimeStatus(plugin.id).pid, "number");
+  }
+  const registry = new CommandRegistry(f.manager);
+  const commands = registry.desired("1");
+  assert.equal(
+    commands.length,
+    1 + workers.reduce((count, plugin) => count + plugin.commands.length, 0),
+  );
+  assert.equal(f.manager.configuration("voice", "1").enabled, false);
+  assert.equal(f.manager.runtimeStatus("voice").pid, undefined);
+  await assert.rejects(
+    f.manager.setEnabled("voice", "1", true, "0"),
+    /NoX Voice service is unavailable/,
+  );
+  assert.deepEqual(registry.desired("1"), commands);
+  for (const plugin of workers)
+    assert.equal(f.manager.isActive(plugin.id, "1"), true);
+});

@@ -16,6 +16,10 @@ import { MessagingService } from "../dist/core/messaging.js";
 import { AuthService } from "../dist/core/auth.js";
 const url = process.env.NOX_BOT_TEST_STATE_URL,
   container = process.env.NOX_BOT_TEST_STATE_CONTAINER;
+// Voice is hosted by Core with explicit activation, not by the recoverable text workers.
+const workerPlugins = builtInPlugins.filter(
+  (plugin) => !plugin.capabilities.includes("voice"),
+);
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate, timeout = 10000) {
   const deadline = Date.now() + timeout;
@@ -67,19 +71,21 @@ test(
       secrets: { apiKey: "fixture-key" },
       expectedRevision: "0",
     });
-    for (const plugin of builtInPlugins)
+    for (const plugin of workerPlugins)
       await plugins.setEnabled(
         plugin.id,
         guildId,
         true,
         plugins.configuration(plugin.id, guildId).revision,
       );
-    for (const plugin of builtInPlugins)
+    for (const plugin of workerPlugins)
       assert.equal(
         plugins.isActive(plugin.id, guildId),
         true,
         `${plugin.id}: ${JSON.stringify(plugins.runtimeStatus(plugin.id))}`,
       );
+    assert.equal(plugins.configuration("voice", guildId).enabled, false);
+    assert.equal(plugins.runtimeStatus("voice").pid, undefined);
     const quick = new QuickCommandService(state);
     await quick.save(
       guildId,
@@ -106,7 +112,7 @@ test(
       signed = await auth.completeLogin("code", nonce, nonce),
       sessionToken = signed.cookie.split(";")[0].split("=")[1];
     const pids = Object.fromEntries(
-      builtInPlugins.map((plugin) => [
+      workerPlugins.map((plugin) => [
         plugin.id,
         plugins.runtimeStatus(plugin.id).pid,
       ]),
@@ -125,6 +131,7 @@ test(
     stop();
     await until(() => !state.writable);
     assert.equal(state.initialized, true);
+    assert.equal(plugins.configuration("voice", guildId).enabled, false);
     assert.equal(quick.response(guildId, "hello"), "Public response");
     assert.equal(auth.authenticate(sessionToken).userId, "7");
     assert.throws(() => auth.beginLogin(), { code: "STATE_UNAVAILABLE" });
@@ -145,7 +152,7 @@ test(
         command: "",
       };
     const results = {};
-    for (const plugin of builtInPlugins)
+    for (const plugin of workerPlugins)
       results[plugin.id] = await plugins.execute(
         plugin.id,
         plugin.commands[0].handler,
@@ -159,7 +166,7 @@ test(
     assert.equal(results.dictionary.attachments.length, 1);
     assert.match(results.ping.content, /Pong/);
     assert.ok(results.userinfo.embeds.length);
-    for (const plugin of builtInPlugins)
+    for (const plugin of workerPlugins)
       assert.equal(plugins.runtimeStatus(plugin.id).pid, pids[plugin.id]);
     await assert.rejects(
       plugins.setEnabled(
@@ -210,7 +217,14 @@ test(
         },
       });
     await reconciler.reconcile(guildId);
-    assert.equal(actual.length, 5);
+    assert.equal(
+      actual.length,
+      1 +
+        workerPlugins.reduce(
+          (count, plugin) => count + plugin.commands.length,
+          0,
+        ),
+    );
     const count = writes;
     await reconciler.reconcile(guildId);
     assert.equal(writes, count);
@@ -227,6 +241,7 @@ test(
     await until(() => cold.initialized);
     await waiting;
     await until(() => state.writable);
+    assert.equal(plugins.configuration("voice", guildId).enabled, false);
     assert.equal(quick.response(guildId, "hello"), "Public response");
     assert.equal(
       cold.get("quick", guildId, "hello").data.response,
