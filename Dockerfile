@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24.22.1-bookworm-slim AS build
+FROM node:26-bookworm-slim AS build
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates python3 make g++ pkg-config libhunspell-dev && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
@@ -13,7 +13,7 @@ ARG NOX_BOT_BUILD_VERSION=dev
 RUN NOX_BOT_BUILD_VERSION="$NOX_BOT_BUILD_VERSION" npm run typecheck && npm run build && npm run build:web
 RUN npm prune --omit=dev && npm cache clean --force
 
-FROM node:24.22.1-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libhunspell-1.7-0 && rm -rf /var/lib/apt/lists/* && groupadd --gid 10001 nox && useradd --uid 10001 --gid nox --home-dir /app --no-create-home nox
