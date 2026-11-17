@@ -20,22 +20,22 @@ No Authorization header, cookie or CSRF token is needed. Anyone with network acc
 
 All inputs are objects. IDs and revisions are strings. The server ID comes exclusively from the URL: extra fields, including `guildId`, are rejected. `_meta.cli` contains only the app-relative command below.
 
-| Tool | `_meta.cli` | Arguments |
-| --- | --- | --- |
-| `status` | `status` | `{}` |
-| `guild_get_id` | `guild get id` | `{}` |
-| `channel_list` | `channel list` | `{}` |
-| `message_send` | `message send` | `channelId`, `content` |
-| `command_list` | `command list` | `{}` |
-| `plugin_list` | `plugin list` | `{}` |
-| `plugin_get` | `plugin get` | `pluginId` |
-| `plugin_enable` | `plugin enable` | `pluginId`, `expectedRevision` |
-| `plugin_disable` | `plugin disable` | `pluginId`, `expectedRevision` |
-| `plugin_configure` | `plugin configure` | `pluginId`, `settings`, `expectedRevision`, optional `secrets` |
-| `quick_command_list` | `quick-command list` | `{}` |
-| `quick_command_create` | `quick-command create` | `trigger`, `response`, `enabled` |
-| `quick_command_update` | `quick-command update` | `trigger`, `response`, `enabled`, `expectedRevision` |
-| `quick_command_delete` | `quick-command delete` | `trigger`, `expectedRevision` |
+| Tool                   | `_meta.cli`            | Arguments                                                      |
+| ---------------------- | ---------------------- | -------------------------------------------------------------- |
+| `status`               | `status`               | `{}`                                                           |
+| `guild_get_id`         | `guild get id`         | `{}`                                                           |
+| `channel_list`         | `channel list`         | `{}`                                                           |
+| `message_send`         | `message send`         | `channelId`, `content`                                         |
+| `command_list`         | `command list`         | `{}`                                                           |
+| `plugin_list`          | `plugin list`          | `{}`                                                           |
+| `plugin_get`           | `plugin get`           | `pluginId`                                                     |
+| `plugin_enable`        | `plugin enable`        | `pluginId`, `expectedRevision`                                 |
+| `plugin_disable`       | `plugin disable`       | `pluginId`, `expectedRevision`                                 |
+| `plugin_configure`     | `plugin configure`     | `pluginId`, `settings`, `expectedRevision`, optional `secrets` |
+| `quick_command_list`   | `quick-command list`   | `{}`                                                           |
+| `quick_command_create` | `quick-command create` | `trigger`, `response`, `enabled`                               |
+| `quick_command_update` | `quick-command update` | `trigger`, `response`, `enabled`, `expectedRevision`           |
+| `quick_command_delete` | `quick-command delete` | `trigger`, `expectedRevision`                                  |
 
 `status` exposes this guild's synchronization and command registration state alongside the shared process and Discord connection status. It does not expose the inventory of other guilds. `channel_list` includes only supported channels where the bot can view and send messages. `message_send` uses the existing guild messaging service, checks current channel permissions and membership, and suppresses mentions. It cannot target another guild or a DM.
 

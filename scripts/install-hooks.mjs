@@ -28,7 +28,7 @@ if (!process.env.CI && !process.env.VERCEL && process.env.NOX_SKIP_HOOKS !== "1"
     } else {
       git("config", "--local", "core.hooksPath", ".githooks");
       console.log(
-        "Git hooks installed: staged style checks before commit; project checks before push.",
+        "Git hooks installed: automatic staged formatting before commit; project checks before push.",
       );
     }
   }

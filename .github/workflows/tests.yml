@@ -94,9 +94,24 @@ jobs:
             docker run --rm --platform linux/${{ matrix.arch }} --mount "type=bind,source=$PWD/tests,target=/app/tests,readonly" --entrypoint node nox-bot:validation-${{ matrix.arch }} /app/tests/fixtures/docker-smoke.mjs "$mode"
           done
 
+  formatting:
+    name: Formatting
+    needs: plan
+    if: needs.plan.outputs.mode == 'full'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26"
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run format:check
+      - run: npm run test:format
+
   approved:
     name: CI approved
-    needs: [plan, policy, test, container]
+    needs: [plan, policy, test, container, formatting]
     if: ${{ !cancelled() && needs.plan.outputs.mode == 'full' }}
     runs-on: ubuntu-latest
     steps:

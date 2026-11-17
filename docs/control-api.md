@@ -4,13 +4,13 @@ The control API is an optional machine-readable interface for external clients, 
 
 ## Configuration
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `NOX_BOT_API_ENABLED` | `false` | Exactly `true` enables HTTP. A key alone does not enable it. |
-| `NOX_BOT_API_HOST` | `127.0.0.1` | Bind IP address or `localhost`; IPv6 is supported. |
-| `NOX_BOT_API_PORT` | `3100` | Port from 1 to 65535. |
-| `NOX_BOT_API_KEY` | unset | Required when enabled; no whitespace; must differ from the Discord token, including its normalized form. |
-| `NOX_BOT_VERSION` | unset | Optional runtime application-version override. |
+| Variable              | Default     | Meaning                                                                                                  |
+| --------------------- | ----------- | -------------------------------------------------------------------------------------------------------- |
+| `NOX_BOT_API_ENABLED` | `false`     | Exactly `true` enables HTTP. A key alone does not enable it.                                             |
+| `NOX_BOT_API_HOST`    | `127.0.0.1` | Bind IP address or `localhost`; IPv6 is supported.                                                       |
+| `NOX_BOT_API_PORT`    | `3100`      | Port from 1 to 65535.                                                                                    |
+| `NOX_BOT_API_KEY`     | unset       | Required when enabled; no whitespace; must differ from the Discord token, including its normalized form. |
+| `NOX_BOT_VERSION`     | unset       | Optional runtime application-version override.                                                           |
 
 Discord uses `DISCORD_TOKEN` and `DISCORD_CLIENT_ID`. Guild selection comes from the real client; plugin settings and encrypted secrets are stored per guild in SQLite and managed through the dashboard's Plugins page. Quick Commands are managed on their own dashboard page. Guild command registrations reconcile automatically at startup, relevant configuration changes, guild installation and Discord recovery; no manual refresh is needed. The Control API does not read the legacy Weather key or command JSON.
 
@@ -134,23 +134,23 @@ No attachments, explicit embeds, replies, history, edits, deletion or management
 { "code": "CHANNEL_NOT_FOUND", "message": "Channel not found." }
 ```
 
-| HTTP | Code | Meaning |
-| --- | --- | --- |
-| 401 | `AUTH_REQUIRED` | Authorization header absent. |
-| 401 | `AUTH_INVALID` | Invalid credential, scheme or duplicate headers. |
-| 400 | `INVALID_PAYLOAD` | Invalid JSON, ID, content or fields. |
-| 400 | `INVALID_CHANNEL` | Channel type outside the supported scope. |
-| 404 | `GUILD_NOT_FOUND` | Guild unknown to the bot or removed. |
-| 404 | `CHANNEL_NOT_FOUND` | Channel does not exist. |
-| 403 | `INSUFFICIENT_PERMISSIONS` | Missing access or send permissions. |
-| 503 | `DISCORD_UNAVAILABLE` | Client/guild unavailable or transient Discord request failure. |
-| 503 | `SERVICE_UNAVAILABLE` | Operation unavailable during startup/shutdown. |
-| 422 | `MESSAGE_REJECTED` | Discord specifically blocks the message, such as AutoMod. |
-| 413 | `PAYLOAD_TOO_LARGE` | Body exceeds 16 KiB. |
-| 415 | `UNSUPPORTED_MEDIA_TYPE` | Unsupported Content-Type. |
-| 404 | `ROUTE_NOT_FOUND` | Unknown route. |
-| 405 | `METHOD_NOT_ALLOWED` | Incorrect method; `Allow` states the supported method. |
-| 500 | `INTERNAL_ERROR` | Unexpected failure with details omitted. |
+| HTTP | Code                       | Meaning                                                        |
+| ---- | -------------------------- | -------------------------------------------------------------- |
+| 401  | `AUTH_REQUIRED`            | Authorization header absent.                                   |
+| 401  | `AUTH_INVALID`             | Invalid credential, scheme or duplicate headers.               |
+| 400  | `INVALID_PAYLOAD`          | Invalid JSON, ID, content or fields.                           |
+| 400  | `INVALID_CHANNEL`          | Channel type outside the supported scope.                      |
+| 404  | `GUILD_NOT_FOUND`          | Guild unknown to the bot or removed.                           |
+| 404  | `CHANNEL_NOT_FOUND`        | Channel does not exist.                                        |
+| 403  | `INSUFFICIENT_PERMISSIONS` | Missing access or send permissions.                            |
+| 503  | `DISCORD_UNAVAILABLE`      | Client/guild unavailable or transient Discord request failure. |
+| 503  | `SERVICE_UNAVAILABLE`      | Operation unavailable during startup/shutdown.                 |
+| 422  | `MESSAGE_REJECTED`         | Discord specifically blocks the message, such as AutoMod.      |
+| 413  | `PAYLOAD_TOO_LARGE`        | Body exceeds 16 KiB.                                           |
+| 415  | `UNSUPPORTED_MEDIA_TYPE`   | Unsupported Content-Type.                                      |
+| 404  | `ROUTE_NOT_FOUND`          | Unknown route.                                                 |
+| 405  | `METHOD_NOT_ALLOWED`       | Incorrect method; `Allow` states the supported method.         |
+| 500  | `INTERNAL_ERROR`           | Unexpected failure with details omitted.                       |
 
 Protected routes authenticate before parsing bodies or accessing Discord. Discord.js retains its normal internal rate-limit queues/retries; events and waiting do not produce HTTP 429. No artificial `RATE_LIMITED` response is implemented. Low-level malformed HTTP, connection failures and Node transport timeouts are transport failures and need not contain the application JSON error contract.
 

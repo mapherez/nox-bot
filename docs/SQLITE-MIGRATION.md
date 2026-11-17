@@ -22,15 +22,15 @@ This is an application/container file path. With the image working directory `/a
 
 Remove these obsolete variables **if present** in the deployment environment, Compose overrides or CI configuration:
 
-| Removed variable | Former purpose |
-| --- | --- |
-| `NOX_BOT_SPACETIMEDB_URL` | External database connection |
-| `NOX_BOT_SPACETIMEDB_DATABASE` | External database name |
-| `NOX_BOT_SPACETIMEDB_TOKEN` | Database service identity |
-| `NOX_BOT_STATE_CREDENTIAL_FILE` | Publisher/service credential file |
+| Removed variable                  | Former purpose                            |
+| --------------------------------- | ----------------------------------------- |
+| `NOX_BOT_SPACETIMEDB_URL`         | External database connection              |
+| `NOX_BOT_SPACETIMEDB_DATABASE`    | External database name                    |
+| `NOX_BOT_SPACETIMEDB_TOKEN`       | Database service identity                 |
+| `NOX_BOT_STATE_CREDENTIAL_FILE`   | Publisher/service credential file         |
 | `NOX_BOT_SERVICE_CREDENTIAL_FILE` | Provisioned application credential output |
-| `NOX_BOT_STATE_BUNDLE` | Published database module |
-| `NOX_BOT_SPACETIMEDB_IMAGE` | Custom database/toolchain image |
+| `NOX_BOT_STATE_BUNDLE`            | Published database module                 |
+| `NOX_BOT_SPACETIMEDB_IMAGE`       | Custom database/toolchain image           |
 
 The old test-only `NOX_BOT_TEST_STATE_*` settings are also removed. `db:build` and `db:generate` no longer exist; `test:state` now runs local SQLite integration tests.
 

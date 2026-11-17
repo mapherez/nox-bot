@@ -13,12 +13,5 @@
       "args": ["run", "check:code"],
       "cwd": "."
     }
-  ],
-  "format": [
-    {
-      "command": "npm",
-      "args": ["exec", "--no", "--", "vp", "fmt"],
-      "cwd": "."
-    }
   ]
 }

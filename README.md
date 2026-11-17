@@ -4,17 +4,17 @@ A multi-server Discord bot with built-in plugins, an owner-only dashboard and re
 
 ## Commands
 
-| Command | Behaviour |
-| --- | --- |
-| `/weather [location]` | Current conditions, server default location, Celsius/Fahrenheit and private refresh |
-| `/definition <word>` | Portuguese accent correction, Priberam definitions/images and link fallback |
-| `/userinfo [user]` | Discord account and server membership |
-| `/ping` | Interaction latency |
-| `/nox help` | Commands available in this server |
-| `/nox commands` | Private paginated Quick Commands menu; selecting sends a public response |
-| `/nox guildid` | Current server ID |
-| `!trigger` | Public Quick Command response; arguments ignored, case insensitive, input cleanup attempted |
-| `!help` | Enabled Quick Commands from the same registry as the slash menu |
+| Command               | Behaviour                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------- |
+| `/weather [location]` | Current conditions, server default location, Celsius/Fahrenheit and private refresh         |
+| `/definition <word>`  | Portuguese accent correction, Priberam definitions/images and link fallback                 |
+| `/userinfo [user]`    | Discord account and server membership                                                       |
+| `/ping`               | Interaction latency                                                                         |
+| `/nox help`           | Commands available in this server                                                           |
+| `/nox commands`       | Private paginated Quick Commands menu; selecting sends a public response                    |
+| `/nox guildid`        | Current server ID                                                                           |
+| `!trigger`            | Public Quick Command response; arguments ignored, case insensitive, input cleanup attempted |
+| `!help`               | Enabled Quick Commands from the same registry as the slash menu                             |
 
 New servers have no enabled plugins or Quick Commands. Configuration is isolated by Discord server ID. Enable plugins and manage Quick Commands in the dashboard; guild slash registrations converge automatically. The bot needs the Message Content intent for Quick Commands and permission to view/send in their channels. Manage Messages allows input cleanup; lack of this permission does not prevent the response.
 
@@ -108,9 +108,7 @@ On **Quick Commands**, open the vertical three-dot menu beside **Add command**. 
 Backups contain only `trigger`, `response` and `enabled`, so they can be restored after a database migration or into another server. The format is a JSON array:
 
 ```json
-[
-  { "trigger": "rules", "response": "Read the server rules.", "enabled": true }
-]
+[{ "trigger": "rules", "response": "Read the server rules.", "enabled": true }]
 ```
 
 Files are validated completely before writing. Imports are limited to 16 MiB per request and the complete list is committed in one atomic SQLite transaction. Concurrent edits are protected by revision checks. Export remains available from the last confirmed list during a database outage; import requires synchronization.

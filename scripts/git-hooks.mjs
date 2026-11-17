@@ -57,19 +57,11 @@ async function main() {
   if (process.env.NOX_SKIP_HOOKS === "1") return;
   const mode = process.argv[2];
   if (mode === "commit") {
-    git("diff", "--cached", "--check");
+    const { formatFiles } = await import("./format-files.mjs");
+    await formatFiles({ staged: true });
     const files = git("diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z")
       .split("\0")
       .filter(Boolean);
-    for (const path of files.filter((path) => path.endsWith(".go"))) {
-      const contents = git("show", `:${path}`);
-      if (run("gofmt", [], root, contents) !== contents)
-        throw new Error(`${path} needs gofmt. Run npm run format and stage the result.`);
-    }
-    for (const folder of config.vite ?? []) {
-      if (files.some((path) => folder === "." || path.startsWith(`${folder}/`)))
-        npm(["exec", "--no", "--", "vp", "staged"], join(root, folder));
-    }
     if (config.husky && files.some((path) => /\.(?:[cm]?js|jsx|tsx?)$/.test(path)))
       run("sh", [".husky/pre-commit"]);
     if (files.some((path) => path.endsWith(".py")) && config.python) {
@@ -91,21 +83,12 @@ async function main() {
     }
     npm(["run", "prepush"]);
   } else if (mode === "check" || mode === "format") {
-    if (config.go) {
-      const files = git("ls-files", "-z", "--", "*.go").split("\0").filter(Boolean);
-      if (files.length) {
-        if (mode === "format") run("gofmt", ["-w", ...files]);
-        else {
-          const unformatted = execFileSync("gofmt", ["-l", ...files], {
-            cwd: root,
-            encoding: "utf8",
-          });
-          if (unformatted.trim()) throw new Error(`Run npm run format:\n${unformatted}`);
-        }
-      }
+    const { formatFiles } = await import("./format-files.mjs");
+    if (mode === "format") await formatFiles();
+    else {
+      await formatFiles({ check: true });
+      for (const task of config.check ?? []) run(task.command, task.args, join(root, task.cwd));
     }
-    for (const task of config[mode] ?? [])
-      run(task.command, task.args, resolve(root, task.cwd ?? "."));
   } else throw new Error("Usage: git-hooks.mjs commit | push | check | format");
 }
 main().catch((error) => {

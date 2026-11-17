@@ -25,11 +25,12 @@
     "prepare": "node --input-type=module -e \"import { existsSync } from 'node:fs'; if (existsSync('scripts/install-hooks.mjs')) await import('./scripts/install-hooks.mjs');\"",
     "precommit": "node scripts/git-hooks.mjs commit",
     "check": "node scripts/git-hooks.mjs check",
-    "prepush": "npm run check",
+    "prepush": "node scripts/format-files.mjs --check --revision HEAD && npm run check",
     "test:release": "node --test scripts/release.test.mjs scripts/ci-policy.test.mjs",
     "check:code": "vp check",
-    "format:check": "vp fmt --check",
-    "format": "vp fmt"
+    "format:check": "node scripts/format-files.mjs --check",
+    "format": "node scripts/format-files.mjs",
+    "test:format": "node --test scripts/format-files.test.mjs"
   },
   "dependencies": {
     "@discordjs/opus": "0.10.0",
@@ -46,12 +47,15 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.3.1",
+    "@prettier/plugin-xml": "3.4.2",
     "@types/node": "^24.6.2",
     "@types/ws": "8.18.1",
+    "prettier": "3.10.1",
+    "prettier-plugin-sh": "0.20.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "vite-plus": "1.6.0",
-    "vite": "npm:@voidzero-dev/vite-plus-core@1.6.0"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.6.0",
+    "vite-plus": "1.6.0"
   },
   "overrides": {
     "@discordjs/node-pre-gyp": {
