@@ -1,0 +1,92 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+concurrency:
+  group: nox-bot-release
+  cancel-in-progress: false
+jobs:
+  approval:
+    name: Reuse approved source CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      source_sha: ${{ steps.ci.outputs.source_sha }}
+      ci_run_id: ${{ steps.ci.outputs.ci_run_id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26"
+          package-manager-cache: false
+      - name: Require successful CI for the exact source
+        id: ci
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const { requireApprovedCI } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/ci-policy.mjs`).href);
+            const tag = context.ref.startsWith('refs/tags/') ? context.ref.slice('refs/tags/'.length) : '';
+            if (!tag) throw new Error("Release requires a version tag.");
+            const approval = await requireApprovedCI({ github, ...context.repo, revision: context.sha, tag });
+            core.setOutput('source_sha', approval.sourceSha);
+            core.setOutput('ci_run_id', String(approval.runId));
+            core.notice(`Reusing source CI ${approval.runId} (${approval.sourceSha}); no source checks are repeated.`);
+
+  publish:
+    needs: approval
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Refuse an existing release
+        uses: actions/github-script@v8
+        with:
+          script: |
+            try {
+              await github.rest.repos.getReleaseByTag({ ...context.repo, tag: context.ref.slice('refs/tags/'.length) });
+              throw new Error('This release already exists.');
+            } catch (error) { if (error.status !== 404) throw error; }
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish release image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: |
+            ghcr.io/mapherez/nox-bot:${{ github.ref_name }}
+            ${{ !contains(github.ref_name, '-') && 'ghcr.io/mapherez/nox-bot:latest' || '' }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: NOX_BOT_BUILD_VERSION=${{ github.ref_name }}
+      - name: Create GitHub Release
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const tag = context.ref.slice('refs/tags/'.length);
+            await github.rest.repos.createRelease({ ...context.repo, tag_name: tag, name: tag,
+              generate_release_notes: true, prerelease: tag.includes('-') });

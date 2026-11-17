@@ -9,10 +9,7 @@ import { SqliteTransport, loadSqliteConfig } from "../storage/sqlite.js";
 import { PluginManager } from "../plugins/manager.js";
 import { builtInPlugins } from "../plugins/catalog.js";
 import { loadControlApiConfig, type ProcessState } from "../controlApi.js";
-import {
-  createServiceInfo,
-  resolveRuntimeVersion,
-} from "../utils/runtimeVersion.js";
+import { createServiceInfo, resolveRuntimeVersion } from "../utils/runtimeVersion.js";
 import Logger from "../utils/logger.js";
 import { VoiceController } from "../voice/controller.js";
 import { VoiceService } from "../voice/service.js";
@@ -68,15 +65,11 @@ export class Runtime implements ManagedRuntime {
     )
       throw new Error("Invalid dashboard listener configuration.");
     const vault = new SecretVault(env.NOX_BOT_ENCRYPTION_KEY ?? "");
-    let voiceController: VoiceController | undefined,
-      voiceError: string | undefined;
+    let voiceController: VoiceController | undefined, voiceError: string | undefined;
     try {
       voiceController = await VoiceController.fromEnvironment(env);
     } catch (error) {
-      voiceError =
-        error instanceof Error
-          ? error.message
-          : "NoX Voice configuration is invalid.";
+      voiceError = error instanceof Error ? error.message : "NoX Voice configuration is invalid.";
     }
     const info = createServiceInfo(await resolveRuntimeVersion(env));
     return new Runtime(
@@ -122,24 +115,14 @@ export class Runtime implements ManagedRuntime {
     this.plugins.attachVoice(voice);
     const quick = new QuickCommandService(this.state),
       registry = new CommandRegistry(this.plugins);
-    this.auth = new AuthService(
-      this.state,
-      authConfig,
-      new DiscordOAuth(authConfig),
-    );
+    this.auth = new AuthService(this.state, authConfig, new DiscordOAuth(authConfig));
     this.reconciler = CommandReconciler.discord(
       env.DISCORD_TOKEN!,
       env.DISCORD_CLIENT_ID!,
       registry,
     );
     this.bot.attach(
-      new InteractionRouter(
-        this.bot.client,
-        registry,
-        this.plugins,
-        quick,
-        messaging,
-      ),
+      new InteractionRouter(this.bot.client, registry, this.plugins, quick, messaging),
       quick,
       messaging,
     );
@@ -158,13 +141,7 @@ export class Runtime implements ManagedRuntime {
       voice,
     );
     if (apiConfig.enabled)
-      this.api = new ControlApi(
-        apiConfig,
-        operations,
-        info,
-        processState,
-        fatal,
-      );
+      this.api = new ControlApi(apiConfig, operations, info, processState, fatal);
     const reconcile = async (force = false) => {
       await Promise.all(
         [...this.bot.client.guilds.cache.keys()].map(async (guildId) => {

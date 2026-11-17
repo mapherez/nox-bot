@@ -1,10 +1,5 @@
 import { ApplicationCommandOptionType } from "discord.js";
-import {
-  noSettings,
-  noSecrets,
-  plainSettings,
-  type PluginDefinition,
-} from "./sdk.js";
+import { noSettings, noSecrets, plainSettings, type PluginDefinition } from "./sdk.js";
 
 export const builtInPlugins: readonly PluginDefinition[] = [
   {
@@ -39,17 +34,13 @@ export const builtInPlugins: readonly PluginDefinition[] = [
     validateSettings(value) {
       const data = plainSettings(value);
       if (
-        Object.keys(data).some(
-          (key) => !["units", "defaultLocation"].includes(key),
-        ) ||
+        Object.keys(data).some((key) => !["units", "defaultLocation"].includes(key)) ||
         !["celsius", "fahrenheit"].includes(String(data.units)) ||
         typeof data.defaultLocation !== "string" ||
         !data.defaultLocation.trim() ||
         data.defaultLocation.length > 200
       )
-        throw new Error(
-          "Choose valid units and a default location (1–200 characters).",
-        );
+        throw new Error("Choose valid units and a default location (1–200 characters).");
       return {
         units: String(data.units),
         defaultLocation: data.defaultLocation.trim(),
@@ -62,9 +53,7 @@ export const builtInPlugins: readonly PluginDefinition[] = [
         value.apiKey.length > 512 ||
         /\s/.test(value.apiKey)
       )
-        throw new Error(
-          "A Weather API key is required before enabling the plugin.",
-        );
+        throw new Error("A Weather API key is required before enabling the plugin.");
     },
   },
   {
@@ -153,8 +142,7 @@ export const builtInPlugins: readonly PluginDefinition[] = [
   {
     id: "voice",
     name: "NoX Voice",
-    description:
-      "Voice conversations through nox-voice-mlx in a Discord voice channel.",
+    description: "Voice conversations through nox-voice-mlx in a Discord voice channel.",
     version: "1.0.0",
     icon: "activity",
     runtimeEntry: "./voice/runtime.js",

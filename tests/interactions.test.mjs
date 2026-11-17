@@ -48,7 +48,7 @@ function interaction(commandName = "ping", overrides = {}) {
   };
   return value;
 }
-test("top-level plugin interactions defer privately and remain operational with cached state while DB is unavailable", async (t) => {
+void test("top-level plugin interactions defer privately and remain operational with cached state while DB is unavailable", async (t) => {
   const f = await memoryState(t);
   await f.plugins.setEnabled("ping", "1", true, "0");
   const client = { guilds: { cache: new Map([["1", {}]]) } },
@@ -73,7 +73,7 @@ test("top-level plugin interactions defer privately and remain operational with 
   await router.handle(other);
   assert.equal(other.calls[0][1].flags, MessageFlags.Ephemeral);
 });
-test("Quick Command menu is private, paginated and owner-bound; selection sends publicly through Core", async (t) => {
+void test("Quick Command menu is private, paginated and owner-bound; selection sends publicly through Core", async (t) => {
   const f = await memoryState(t),
     quick = new QuickCommandService(f.state),
     sent = [];

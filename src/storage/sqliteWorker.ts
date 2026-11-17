@@ -4,39 +4,24 @@ import { dirname } from "node:path";
 import { mkdirSync, openSync, closeSync, existsSync } from "node:fs";
 import { validateStateDocument } from "../shared/stateValidation.js";
 import { StateError, type StateChange, type StateRow } from "../core/state.js";
-import type {
-  SqliteRequest,
-  SqliteReply,
-  SqliteSnapshot,
-} from "./sqliteProtocol.js";
+import type { SqliteRequest, SqliteReply, SqliteSnapshot } from "./sqliteProtocol.js";
 
 const APPLICATION_ID = 0x4e4f5842;
 const MAX_REVISION = 18446744073709551615n;
 let database: DatabaseSync | undefined;
 function db(): DatabaseSync {
-  if (!database)
-    throw new StateError(
-      "STATE_UNAVAILABLE",
-      "The SQLite database is not open.",
-    );
+  if (!database) throw new StateError("STATE_UNAVAILABLE", "The SQLite database is not open.");
   return database;
 }
 function snapshot(): SqliteSnapshot {
   const connection = db();
-  const revision = connection
-    .prepare("SELECT revision FROM state_meta WHERE id = 1")
-    .get()!;
+  const revision = connection.prepare("SELECT revision FROM state_meta WHERE id = 1").get()!;
   const rows = connection
-    .prepare(
-      "SELECT key, kind, guild_id AS guildId, value, revision FROM documents ORDER BY key",
-    )
+    .prepare("SELECT key, kind, guild_id AS guildId, value, revision FROM documents ORDER BY key")
     .all();
   return {
     sequence: BigInt(revision.revision as string),
-    rows: rows.map(
-      (row) =>
-        ({ ...row, revision: BigInt(row.revision as string) }) as StateRow,
-    ),
+    rows: rows.map((row) => ({ ...row, revision: BigInt(row.revision as string) }) as StateRow),
   };
 }
 function open(filename: string, create: boolean): SqliteSnapshot {
@@ -51,10 +36,8 @@ function open(filename: string, create: boolean): SqliteSnapshot {
   database = new DatabaseSync(filename, { timeout: 250 });
   try {
     const connection = db();
-    const version = connection.prepare("PRAGMA user_version").get()!
-      .user_version;
-    const applicationId = connection.prepare("PRAGMA application_id").get()!
-      .application_id;
+    const version = connection.prepare("PRAGMA user_version").get()!.user_version;
+    const applicationId = connection.prepare("PRAGMA application_id").get()!.application_id;
     if (!create && version === 0)
       throw new StateError(
         "STATE_UNAVAILABLE",
@@ -62,9 +45,7 @@ function open(filename: string, create: boolean): SqliteSnapshot {
       );
     if (version === 0 && applicationId === 0) {
       const tables = connection
-        .prepare(
-          "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
-        )
+        .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
         .all();
       if (tables.length)
         throw new StateError(
@@ -98,10 +79,7 @@ function open(filename: string, create: boolean): SqliteSnapshot {
 }
 function mutate(changes: readonly StateChange[]): SqliteSnapshot {
   if (!Array.isArray(changes) || !changes.length)
-    throw new StateError(
-      "INVALID_STATE",
-      "A non-empty transaction is required.",
-    );
+    throw new StateError("INVALID_STATE", "A non-empty transaction is required.");
   const connection = db(),
     seen = new Set<string>();
   for (const change of changes) {
@@ -110,10 +88,7 @@ function mutate(changes: readonly StateChange[]): SqliteSnapshot {
       change.expectedRevision < 0n ||
       change.expectedRevision > MAX_REVISION
     )
-      throw new StateError(
-        "INVALID_STATE",
-        "Invalid transaction key or revision.",
-      );
+      throw new StateError("INVALID_STATE", "Invalid transaction key or revision.");
     seen.add(change.key);
     try {
       if (change.value !== null && change.value.length > 65536)
@@ -130,23 +105,16 @@ function mutate(changes: readonly StateChange[]): SqliteSnapshot {
   }
   connection.exec("BEGIN IMMEDIATE");
   try {
-    const get = connection.prepare(
-      "SELECT revision FROM documents WHERE key = ?",
-    );
+    const get = connection.prepare("SELECT revision FROM documents WHERE key = ?");
     for (const change of changes) {
       const previous = get.get(change.key);
-      if (
-        BigInt((previous?.revision as string | undefined) ?? "0") !==
-        change.expectedRevision
-      )
+      if (BigInt((previous?.revision as string | undefined) ?? "0") !== change.expectedRevision)
         throw new StateError(
           "STATE_CONFLICT",
           "Configuration changed elsewhere. Review the latest state before saving.",
         );
     }
-    const previous = connection
-      .prepare("SELECT revision FROM state_meta WHERE id = 1")
-      .get()!;
+    const previous = connection.prepare("SELECT revision FROM state_meta WHERE id = 1").get()!;
     const revision = BigInt(previous.revision as string) + 1n;
     if (revision > MAX_REVISION)
       throw new StateError("INVALID_STATE", "Database revision limit reached.");
@@ -156,18 +124,9 @@ function mutate(changes: readonly StateChange[]): SqliteSnapshot {
     const remove = connection.prepare("DELETE FROM documents WHERE key = ?");
     for (const change of changes) {
       if (change.value === null) remove.run(change.key);
-      else
-        put.run(
-          change.key,
-          change.kind,
-          change.guildId,
-          change.value,
-          revision.toString(),
-        );
+      else put.run(change.key, change.kind, change.guildId, change.value, revision.toString());
     }
-    connection
-      .prepare("UPDATE state_meta SET revision = ? WHERE id = 1")
-      .run(revision.toString());
+    connection.prepare("UPDATE state_meta SET revision = ? WHERE id = 1").run(revision.toString());
     // Construct the snapshot before COMMIT so validation/allocation failures can roll back.
     const result = snapshot();
     connection.exec("COMMIT");
@@ -198,10 +157,7 @@ parentPort!.on("message", (request: SqliteRequest) => {
       error:
         error instanceof StateError
           ? {
-              code: error.code as
-                | "STATE_CONFLICT"
-                | "STATE_UNAVAILABLE"
-                | "INVALID_STATE",
+              code: error.code as "STATE_CONFLICT" | "STATE_UNAVAILABLE" | "INVALID_STATE",
               message: error.message,
             }
           : {

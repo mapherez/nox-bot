@@ -6,11 +6,7 @@ import {
   type StateTransport,
   type TransportCallbacks,
 } from "../core/state.js";
-import type {
-  SqliteReply,
-  SqliteRequest,
-  SqliteSnapshot,
-} from "./sqliteProtocol.js";
+import type { SqliteReply, SqliteRequest, SqliteSnapshot } from "./sqliteProtocol.js";
 import Logger from "../utils/logger.js";
 
 export interface SqliteConfig {
@@ -19,9 +15,7 @@ export interface SqliteConfig {
 export function loadSqliteConfig(env: NodeJS.ProcessEnv): SqliteConfig {
   const filename = env.NOX_BOT_DATABASE_PATH ?? "data/nox-bot.sqlite";
   if (!filename.trim() || filename === ":memory:" || filename.includes("\0"))
-    throw new Error(
-      "NOX_BOT_DATABASE_PATH must name a persistent SQLite file.",
-    );
+    throw new Error("NOX_BOT_DATABASE_PATH must name a persistent SQLite file.");
   return { filename: resolve(filename) };
 }
 type Request = SqliteRequest extends infer R
@@ -74,8 +68,7 @@ export class SqliteTransport implements StateTransport {
       const request = this.requests.get(reply.id);
       if (!request) return;
       this.requests.delete(reply.id);
-      if ("error" in reply)
-        request.reject(new StateError(reply.error.code, reply.error.message));
+      if ("error" in reply) request.reject(new StateError(reply.error.code, reply.error.message));
       else request.resolve(reply.snapshot);
     });
     worker.on("error", () => this.lost(worker));
@@ -99,9 +92,7 @@ export class SqliteTransport implements StateTransport {
   private request(message: Request): Promise<SqliteSnapshot | undefined> {
     const worker = this.worker;
     if (!worker)
-      return Promise.reject(
-        new StateError("STATE_UNAVAILABLE", "SQLite is unavailable."),
-      );
+      return Promise.reject(new StateError("STATE_UNAVAILABLE", "SQLite is unavailable."));
     const id = ++this.requestId;
     return new Promise((resolve, reject) => {
       this.requests.set(id, { resolve, reject });
@@ -109,9 +100,7 @@ export class SqliteTransport implements StateTransport {
         worker.postMessage({ ...message, id });
       } catch {
         this.requests.delete(id);
-        reject(
-          new StateError("STATE_UNAVAILABLE", "SQLite worker is unavailable."),
-        );
+        reject(new StateError("STATE_UNAVAILABLE", "SQLite worker is unavailable."));
       }
     });
   }
@@ -121,11 +110,7 @@ export class SqliteTransport implements StateTransport {
         "WRITE_UNCONFIRMED",
         "SQLite state changed during the operation. Review the confirmed data before retrying.",
       );
-    await this.callbacks!.snapshot(
-      snapshot.rows,
-      snapshot.sequence,
-      generation,
-    );
+    await this.callbacks!.snapshot(snapshot.rows, snapshot.sequence, generation);
   }
   private lost(worker: Worker): void {
     if (this.worker !== worker) return;
@@ -150,9 +135,7 @@ export class SqliteTransport implements StateTransport {
     this.retry = setTimeout(() => {
       this.retry = undefined;
       void this.run(() => this.open()).catch(() => {
-        Logger.warn(
-          "SQLite recovery is pending. Check the persistent data volume.",
-        );
+        Logger.warn("SQLite recovery is pending. Check the persistent data volume.");
         this.scheduleRecovery();
       });
     }, this.retryMs);

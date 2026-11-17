@@ -7,12 +7,8 @@ class EnvironmentValidator {
     const missing = required.filter((key) => !env[key]);
 
     if (missing.length > 0) {
-      Logger.error(
-        `Missing required environment variables: ${missing.join(", ")}`
-      );
-      Logger.info(
-        "Please check your .env file and ensure all required variables are set."
-      );
+      Logger.error(`Missing required environment variables: ${missing.join(", ")}`);
+      Logger.info("Please check your .env file and ensure all required variables are set.");
       throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
     }
 
@@ -22,16 +18,12 @@ class EnvironmentValidator {
       !env.DISCORD_TOKEN.startsWith("MT") ||
       env.DISCORD_TOKEN.length < 50
     ) {
-      Logger.warn(
-        "DISCORD_TOKEN appears to be invalid. Please check your bot token."
-      );
+      Logger.warn("DISCORD_TOKEN appears to be invalid. Please check your bot token.");
     }
 
     // Validate client ID format (should be numeric)
     if (!env.DISCORD_CLIENT_ID || !/^\d+$/.test(env.DISCORD_CLIENT_ID)) {
-      Logger.warn(
-        "DISCORD_CLIENT_ID appears to be invalid. It should be a numeric ID."
-      );
+      Logger.warn("DISCORD_CLIENT_ID appears to be invalid. It should be a numeric ID.");
     }
 
     Logger.success("Environment validation passed");

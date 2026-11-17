@@ -4,14 +4,22 @@ import Logger from "../dist/utils/logger.js";
 
 // Keep routine application logs out of the process-isolated test runner.
 export function quietLogger() {
-  for (const method of ["info", "success", "warn", "error", "debug"]) mock.method(Logger, method, () => {});
+  for (const method of ["info", "success", "warn", "error", "debug"])
+    mock.method(Logger, method, () => {});
 }
 
 export const key = "control-api-test-key-distinct-from-discord";
-export const env = { DISCORD_TOKEN: `MT${"x".repeat(60)}`, DISCORD_CLIENT_ID: "123456789", NOX_BOT_API_ENABLED: "false" };
+export const env = {
+  DISCORD_TOKEN: `MT${"x".repeat(60)}`,
+  DISCORD_CLIENT_ID: "123456789",
+  NOX_BOT_API_ENABLED: "false",
+};
 export function deferred() {
   let resolve, reject;
-  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  const promise = new Promise((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
   return { promise, resolve, reject };
 }
 export async function until(predicate) {
@@ -23,7 +31,11 @@ export async function until(predicate) {
 }
 export function fakeOperations() {
   return {
-    getStatus: () => ({ discord: { state: "connected", ready: true, pingMs: 42 }, bot: { id: "7", username: "NoX" }, guildCount: 1 }),
+    getStatus: () => ({
+      discord: { state: "connected", ready: true, pingMs: 42 },
+      bot: { id: "7", username: "NoX" },
+      guildCount: 1,
+    }),
     listGuilds: async () => [{ id: "1", name: "Guild" }],
     listChannels: async () => [{ id: "2", name: "general", type: "text" }],
     sendMessage: async (channelId) => ({ messageId: "3", channelId, guildId: "1" }),

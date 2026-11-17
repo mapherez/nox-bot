@@ -11,12 +11,8 @@ export default function WeatherPanel({
   save,
 }: PluginPanelProps) {
   const initial = plugin.configuration;
-  const [location, setLocation] = useState(
-    String(initial.settings.defaultLocation ?? "London"),
-  );
-  const [units, setUnits] = useState(
-    String(initial.settings.units ?? "celsius"),
-  );
+  const [location, setLocation] = useState(String(initial.settings.defaultLocation ?? "London"));
+  const [units, setUnits] = useState(String(initial.settings.units ?? "celsius"));
   const [key, setKey] = useState(""),
     [removeKey, setRemoveKey] = useState(false),
     [invalid, setInvalid] = useState("");
@@ -33,22 +29,14 @@ export default function WeatherPanel({
       return;
     }
     setInvalid("");
-    const secrets = removeKey
-      ? { apiKey: null }
-      : key
-        ? { apiKey: key }
-        : undefined;
+    const secrets = removeKey ? { apiKey: null } : key ? { apiKey: key } : undefined;
     if (await save({ defaultLocation: location.trim(), units }, secrets)) {
       setKey("");
       setRemoveKey(false);
     }
   }
   return (
-    <form
-      id="plugin-settings"
-      onSubmit={(event) => void submit(event)}
-      className={s.form}
-    >
+    <form id="plugin-settings" onSubmit={(event) => void submit(event)} className={s.form}>
       <div className={s.preview}>
         <span className={s.weatherSun}>☀</span>
         <div>
@@ -68,9 +56,7 @@ export default function WeatherPanel({
           required
           autoComplete="off"
           aria-describedby="location-hint location-error"
-          onBlur={() =>
-            setInvalid(location.trim() ? "" : "Enter a default location.")
-          }
+          onBlur={() => setInvalid(location.trim() ? "" : "Enter a default location.")}
         />
         <p className={s.hint} id="location-hint">
           Used when /weather is called without a location.
@@ -79,11 +65,7 @@ export default function WeatherPanel({
           {invalid}
         </p>
         <label htmlFor="weather-units">Temperature units</label>
-        <select
-          id="weather-units"
-          value={units}
-          onChange={(event) => setUnits(event.target.value)}
-        >
+        <select id="weather-units" value={units} onChange={(event) => setUnits(event.target.value)}>
           <option value="celsius">Celsius (°C)</option>
           <option value="fahrenheit">Fahrenheit (°F)</option>
         </select>
@@ -95,9 +77,7 @@ export default function WeatherPanel({
             {initial.secrets.apiKey?.configured ? "Configured" : "Required"}
           </Badge>
         </div>
-        <p className={s.hint}>
-          Encrypted for this server. The saved key is never displayed.
-        </p>
+        <p className={s.hint}>Encrypted for this server. The saved key is never displayed.</p>
         <label htmlFor="weather-key">
           {initial.secrets.apiKey?.configured ? "Replace key" : "API key"}
         </label>
@@ -132,16 +112,13 @@ export default function WeatherPanel({
           </label>
         )}
         {removeKey && initial.enabled && (
-          <Notice error>
-            Disable Weather before removing its required key.
-          </Notice>
+          <Notice error>Disable Weather before removing its required key.</Notice>
         )}
       </section>
       {error && <Notice error>{error}</Notice>}
       {!writable && (
         <Notice>
-          Reconnecting — configuration changes temporarily unavailable. Your
-          draft is kept here.
+          Reconnecting — configuration changes temporarily unavailable. Your draft is kept here.
         </Notice>
       )}
       <button type="submit" hidden disabled={!writable || saving}>

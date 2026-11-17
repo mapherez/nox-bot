@@ -30,9 +30,7 @@ export class CommandRegistry {
           plugin.commands.map((command) => ({
             name: command.name,
             description: command.description,
-            options: command.options
-              ? structuredClone(command.options)
-              : undefined,
+            options: command.options ? structuredClone(command.options) : undefined,
           })),
         ),
     ];

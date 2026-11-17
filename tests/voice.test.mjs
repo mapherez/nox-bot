@@ -97,7 +97,7 @@ function fixture() {
   const voice = new VoiceService(controller, discord);
   return { voice, engine, controller, discord, calls, sessions };
 }
-test("silence has the exact Float32LE engine frame contract; mixing clips safely and stays bounded", () => {
+void test("silence has the exact Float32LE engine frame contract; mixing clips safely and stays bounded", () => {
   const mixer = new InputMixer();
   assert.deepEqual(mixer.frame(0), Buffer.alloc(FRAME_BYTES));
   mixer.push("a", new Float32Array(FRAME_SAMPLES * 10).fill(0.75), 0);
@@ -109,27 +109,18 @@ test("silence has the exact Float32LE engine frame contract; mixing clips safely
   mixer.push("a", new Float32Array([NaN, Infinity, 0.5]), 0);
   assert.deepEqual(mixer.frame(1000), Buffer.alloc(FRAME_BYTES));
 });
-test("streaming resampling preserves packet boundaries, channel mix and finite clipped output", () => {
+void test("streaming resampling preserves packet boundaries, channel mix and finite clipped output", () => {
   const pcm = Buffer.alloc(3840);
   for (let i = 0; i < pcm.length; i += 4) {
     pcm.writeInt16LE(16384, i);
     pcm.writeInt16LE(16384, i + 2);
   }
   const converter = new DiscordDownsampler();
-  const small = new Float32Array([
-    ...converter.convert(pcm),
-    ...converter.convert(pcm),
-  ]);
-  assert.deepEqual(
-    small,
-    new DiscordDownsampler().convert(Buffer.concat([pcm, pcm])),
-  );
+  const small = new Float32Array([...converter.convert(pcm), ...converter.convert(pcm)]);
+  assert.deepEqual(small, new DiscordDownsampler().convert(Buffer.concat([pcm, pcm])));
   assert.equal(small.length, 960);
   assert.ok(Math.abs(small.at(-1) - 0.5) < 0.001);
-  assert.equal(
-    new DiscordUpsampler().convert(Buffer.alloc(FRAME_BYTES)).length,
-    15360,
-  );
+  assert.equal(new DiscordUpsampler().convert(Buffer.alloc(FRAME_BYTES)).length, 15360);
   const frame = Buffer.alloc(FRAME_BYTES);
   frame.writeFloatLE(NaN, 0);
   frame.writeFloatLE(5, 4);
@@ -138,7 +129,7 @@ test("streaming resampling preserves packet boundaries, channel mix and finite c
   assert.equal(result.readInt16LE(12), 32767);
   assert.throws(() => converter.convert(Buffer.alloc(3)));
 });
-test("native Opus roundtrip and DAVE dependency load without contacting Discord", () => {
+void test("native Opus roundtrip and DAVE dependency load without contacting Discord", () => {
   const codec = new opus.OpusEncoder(48000, 2);
   assert.equal(codec.decode(codec.encode(Buffer.alloc(3840))).length, 3840);
   assert.match(generateDependencyReport(), /@snazzah\/davey: 0\.1\./);
@@ -156,7 +147,7 @@ async function socketPair(t) {
   await once(client, "open");
   return { client, remote: (await connected)[0] };
 }
-test("real WebSocket pumps silent input every 80 ms and decodes each service audio frame into four Opus packets", async (t) => {
+void test("real WebSocket pumps silent input every 80 ms and decodes each service audio frame into four Opus packets", async (t) => {
   const { client, remote } = await socketPair(t);
   const frames = [],
     times = [],
@@ -179,15 +170,13 @@ test("real WebSocket pumps silent input every 80 ms and decodes each service aud
   audio.close();
   assert.ok(frames.length >= 3);
   assert.ok(times[1] - times[0] >= 45 && times[1] - times[0] < 180);
-  for (const frame of frames)
-    assert.deepEqual(frame, Buffer.alloc(FRAME_BYTES));
+  for (const frame of frames) assert.deepEqual(frame, Buffer.alloc(FRAME_BYTES));
   assert.equal(packets.length, frames.length * 4);
   const decoder = new opus.OpusEncoder(48000, 2);
-  for (const packet of packets)
-    assert.equal(decoder.decode(packet).length, 3840);
+  for (const packet of packets) assert.equal(decoder.decode(packet).length, 3840);
   assert.equal(failures, 0);
 });
-test("closing during initial audio handshake rejects pending work; malformed service audio frames fail closed", async (t) => {
+void test("closing during initial audio handshake rejects pending work; malformed service audio frames fail closed", async (t) => {
   const { client, remote } = await socketPair(t);
   const audio = new EngineAudio(
     client,
@@ -209,7 +198,7 @@ test("closing during initial audio handshake rejects pending work; malformed ser
   await assert.rejects(response);
   assert.equal(failures, 1);
 });
-test("a slow Discord consumer cannot grow the service output queue indefinitely", async (t) => {
+void test("a slow Discord consumer cannot grow the service output queue indefinitely", async (t) => {
   const { client, remote } = await socketPair(t);
   let failures = 0;
   const audio = new EngineAudio(
@@ -224,23 +213,17 @@ test("a slow Discord consumer cannot grow the service output queue indefinitely"
   assert.equal(failures, 1);
   assert.ok(audio.output.writableLength <= 12);
 });
-test("voice requires an already ready and free engine and never starts it implicitly", async () => {
+void test("voice requires an already ready and free engine and never starts it implicitly", async () => {
   const f = fixture();
   f.engine.state = "stopped";
-  await assert.rejects(
-    f.voice.enable("1", { channelId: "10" }),
-    /Start the engine/,
-  );
+  await assert.rejects(f.voice.enable("1", { channelId: "10" }), /Start the engine/);
   f.engine.state = "ready";
   f.engine.conversationActive = true;
-  await assert.rejects(
-    f.voice.enable("1", { channelId: "10" }),
-    /another conversation/,
-  );
+  await assert.rejects(f.voice.enable("1", { channelId: "10" }), /another conversation/);
   assert.deepEqual(f.calls, []);
   await f.voice.close();
 });
-test("disabling leaves the voice service running, empty-channel/no updates preserves session, failures require explicit enable", async () => {
+void test("disabling leaves the voice service running, empty-channel/no updates preserves session, failures require explicit enable", async () => {
   const f = fixture();
   await f.voice.enable("1", { channelId: "10" });
   await f.voice.synchronize(new Map([["1", { channelId: "10" }]]));
@@ -258,7 +241,7 @@ test("disabling leaves the voice service running, empty-channel/no updates prese
   assert.equal(f.sessions.length, 3);
   await f.voice.close();
 });
-test("settings share controller state and reset only the audio conversation while staying in Discord", async () => {
+void test("settings share controller state and reset only the audio conversation while staying in Discord", async () => {
   const f = fixture();
   await f.voice.enable("1", { channelId: "10" });
   const changed = {
@@ -283,7 +266,7 @@ test("settings share controller state and reset only the audio conversation whil
   assert.equal(f.voice.isActive("1"), true);
   await f.voice.close();
 });
-test("settings failure leaves the channel and does not auto-recover", async () => {
+void test("settings failure leaves the channel and does not auto-recover", async () => {
   const f = fixture();
   await f.voice.enable("1", { channelId: "10" });
   f.controller.update = async () => {
@@ -296,7 +279,7 @@ test("settings failure leaves the channel and does not auto-recover", async () =
   assert.equal(f.sessions.length, 1);
   await f.voice.close();
 });
-test("changing channel creates fresh context, and stop/restart require a new manual activation", async () => {
+void test("changing channel creates fresh context, and stop/restart require a new manual activation", async () => {
   const f = fixture();
   await f.voice.enable("1", { channelId: "10" });
   await f.voice.synchronize(new Map([["1", { channelId: "11" }]]));
@@ -308,13 +291,10 @@ test("changing channel creates fresh context, and stop/restart require a new man
   assert.equal(f.sessions.length, 2);
   await f.voice.close();
 });
-test("other webapp and guild conversations cannot be interrupted by voice service controls", async () => {
+void test("other webapp and guild conversations cannot be interrupted by voice service controls", async () => {
   const f = fixture();
   f.engine.conversationActive = true;
-  await assert.rejects(
-    f.voice.applySettings("1", settings),
-    /Another conversation/,
-  );
+  await assert.rejects(f.voice.applySettings("1", settings), /Another conversation/);
   await assert.rejects(f.voice.action("1", "stop"), /Another conversation/);
   f.engine.conversationActive = false;
   await f.voice.enable("1", { channelId: "10" });
@@ -322,7 +302,7 @@ test("other webapp and guild conversations cannot be interrupted by voice servic
   await assert.rejects(f.voice.action("2", "stop"), /Another server/);
   await f.voice.close();
 });
-test("voice remains optional and validates settings and controller URL without reading credentials", async () => {
+void test("voice remains optional and validates settings and controller URL without reading credentials", async () => {
   assert.equal(await VoiceController.fromEnvironment({}), undefined);
   await assert.rejects(
     VoiceController.fromEnvironment({
@@ -340,13 +320,10 @@ test("voice remains optional and validates settings and controller URL without r
   const f = fixture();
   const voice = new VoiceService(undefined, f.discord);
   assert.equal((await voice.status("1")).configured, false);
-  await assert.rejects(
-    voice.enable("1", { channelId: "10" }),
-    /not configured/,
-  );
+  await assert.rejects(voice.enable("1", { channelId: "10" }), /not configured/);
   await voice.close();
 });
-test("persisted enabled configuration is dormant on process startup; existing text plugin still works", async (t) => {
+void test("persisted enabled configuration is dormant on process startup; existing text plugin still works", async (t) => {
   const f = await memoryState(t),
     v = fixture();
   f.plugins.attachVoice(v.voice);
@@ -385,7 +362,7 @@ test("persisted enabled configuration is dormant on process startup; existing te
   await f.plugins.setEnabled("voice", "1", false, revision());
   assert.equal(v.engine.state, "ready");
 });
-test("stale enable cannot join and stale saves leave an existing conversation unchanged", async (t) => {
+void test("stale enable cannot join and stale saves leave an existing conversation unchanged", async (t) => {
   const f = await memoryState(t),
     v = fixture();
   f.plugins.attachVoice(v.voice);
@@ -393,10 +370,7 @@ test("stale enable cannot join and stale saves leave an existing conversation un
     settings: { channelId: "10" },
     expectedRevision: "0",
   });
-  await assert.rejects(
-    f.plugins.setEnabled("voice", "1", true, "0"),
-    /Configuration changed/,
-  );
+  await assert.rejects(f.plugins.setEnabled("voice", "1", true, "0"), /Configuration changed/);
   assert.equal(v.sessions.length, 0);
   const revision = f.plugins.configuration("voice", "1").revision;
   await f.plugins.setEnabled("voice", "1", true, revision);
@@ -410,7 +384,7 @@ test("stale enable cannot join and stale saves leave an existing conversation un
   assert.equal(v.voice.isActive("1"), true);
 });
 
-test("concurrent stale enable requests do not disconnect the winning voice session", async (t) => {
+void test("concurrent stale enable requests do not disconnect the winning voice session", async (t) => {
   const f = await memoryState(t),
     v = fixture();
   f.plugins.attachVoice(v.voice);

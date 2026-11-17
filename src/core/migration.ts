@@ -1,21 +1,11 @@
 import { validateId } from "../controlApi.js";
-import {
-  validateEntity,
-  isRecord,
-  type StateStore,
-  type StateChange,
-} from "./state.js";
+import { validateEntity, isRecord, type StateStore, type StateChange } from "./state.js";
 import type { SecretVault } from "./secrets.js";
 import { builtInPlugins } from "../plugins/catalog.js";
 const SOURCE = "legacy-prefix-weather";
-export function legacyPlan(
-  guildId: string,
-  commands: unknown,
-  weatherKey?: string,
-) {
+export function legacyPlan(guildId: string, commands: unknown, weatherKey?: string) {
   validateId(guildId);
-  if (!isRecord(commands))
-    throw new Error("Legacy Quick Commands must be a JSON object.");
+  if (!isRecord(commands)) throw new Error("Legacy Quick Commands must be a JSON object.");
   const quick = Object.entries(commands).map(([trigger, response]) => {
     const value = {
       guildId,
@@ -54,9 +44,7 @@ export async function importLegacy(
   for (const command of plan.quick) {
     if (state.get("quick", plan.guildId, command.trigger))
       throw new Error("Import would overwrite an existing Quick Command.");
-    changes.push(
-      state.change("quick", plan.guildId, command.trigger, command, "0"),
-    );
+    changes.push(state.change("quick", plan.guildId, command.trigger, command, "0"));
   }
   for (const plugin of builtInPlugins) {
     if (state.get("plugin", plan.guildId, plugin.id))
@@ -76,12 +64,7 @@ export async function importLegacy(
           secrets:
             plugin.id === "weather" && plan.weatherKey
               ? {
-                  apiKey: vault.encrypt(
-                    plan.weatherKey,
-                    plan.guildId,
-                    plugin.id,
-                    "apiKey",
-                  ),
+                  apiKey: vault.encrypt(plan.weatherKey, plan.guildId, plugin.id, "apiKey"),
                 }
               : {},
         },

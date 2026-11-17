@@ -18,9 +18,7 @@ export class VoiceController implements Controller {
     private readonly url: URL,
     private readonly tls: RequestOptions,
   ) {}
-  static async fromEnvironment(
-    env: NodeJS.ProcessEnv,
-  ): Promise<VoiceController | undefined> {
+  static async fromEnvironment(env: NodeJS.ProcessEnv): Promise<VoiceController | undefined> {
     if (!env.NOX_VOICE_CONTROLLER_URL) return undefined;
     try {
       const url = new URL(env.NOX_VOICE_CONTROLLER_URL);
@@ -34,14 +32,12 @@ export class VoiceController implements Controller {
       )
         throw new Error("Invalid controller URL");
       const [ca, cert, key] = await Promise.all(
-        [
-          "NOX_VOICE_CA_FILE",
-          "NOX_VOICE_CLIENT_CERT_FILE",
-          "NOX_VOICE_CLIENT_KEY_FILE",
-        ].map((name) => {
-          if (!env[name]) throw new Error("Missing credential file");
-          return readFile(env[name]!);
-        }),
+        ["NOX_VOICE_CA_FILE", "NOX_VOICE_CLIENT_CERT_FILE", "NOX_VOICE_CLIENT_KEY_FILE"].map(
+          (name) => {
+            if (!env[name]) throw new Error("Missing credential file");
+            return readFile(env[name]!);
+          },
+        ),
       );
       createSecureContext({ ca, cert, key });
       return new VoiceController(url, {
@@ -60,8 +56,7 @@ export class VoiceController implements Controller {
     }
   }
   private json<T>(path: string, method = "GET", payload?: unknown): Promise<T> {
-    const data =
-      payload === undefined ? undefined : Buffer.from(JSON.stringify(payload));
+    const data = payload === undefined ? undefined : Buffer.from(JSON.stringify(payload));
     return new Promise((resolve, reject) => {
       const fail = () =>
         reject(
@@ -113,10 +108,7 @@ export class VoiceController implements Controller {
           });
         },
       );
-      const timeout = setTimeout(
-        () => request.destroy(),
-        method === "PUT" ? 190000 : 10000,
-      );
+      const timeout = setTimeout(() => request.destroy(), method === "PUT" ? 190000 : 10000);
       timeout.unref();
       request.once("close", () => clearTimeout(timeout));
       request.on("error", fail);

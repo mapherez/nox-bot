@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import type {
-  GuildSnapshot,
-  QuickCommandDTO,
-} from "../../src/shared/dashboard";
+import type { GuildSnapshot, QuickCommandDTO } from "../../src/shared/dashboard";
 import {
   parseQuickCommandBackup,
   QUICK_COMMAND_BACKUP_MAX_BYTES,
@@ -63,12 +60,9 @@ export default function QuickCommandBackup({
   }, []);
   useEffect(() => {
     if (!open) return;
-    menu.current
-      ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
-      ?.focus();
+    menu.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
     const outside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !root.current?.contains(event.target))
-        setOpen(false);
+      if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false);
     };
     document.addEventListener("pointerdown", outside);
     return () => document.removeEventListener("pointerdown", outside);
@@ -92,9 +86,8 @@ export default function QuickCommandBackup({
       return;
     }
     const items = [
-      ...(menu.current?.querySelectorAll<HTMLButtonElement>(
-        '[role="menuitem"]:not(:disabled)',
-      ) ?? []),
+      ...(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ??
+        []),
     ];
     const index = items.indexOf(document.activeElement as HTMLButtonElement);
     const next =
@@ -133,9 +126,7 @@ export default function QuickCommandBackup({
       anchor.click();
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      onNotice(
-        `Exported ${content.length} commands, including disabled commands.`,
-      );
+      onNotice(`Exported ${content.length} commands, including disabled commands.`);
     } catch (cause) {
       if (alive.current) onError((cause as Error).message);
     } finally {
@@ -152,34 +143,22 @@ export default function QuickCommandBackup({
         throw new Error("Choose a JSON backup smaller than 16 MiB.");
       let content: unknown;
       try {
-        content = JSON.parse(
-          (await selectedFile.text()).replace(/^\uFEFF/, ""),
-        );
+        content = JSON.parse((await selectedFile.text()).replace(/^\uFEFF/, ""));
       } catch {
         throw new Error("The selected file is not valid JSON.");
       }
       const parsed = parseQuickCommandBackup(content, guildId);
-      if (!parsed.length)
-        throw new Error("This backup contains no commands to import.");
-      const existing = new Map(
-        commands.map((command) => [command.trigger, command.revision]),
-      );
+      if (!parsed.length) throw new Error("This backup contains no commands to import.");
+      const existing = new Map(commands.map((command) => [command.trigger, command.revision]));
       const expectedRevisions = Object.fromEntries(
-        parsed.map((command) => [
-          command.trigger,
-          existing.get(command.trigger) ?? "0",
-        ]),
+        parsed.map((command) => [command.trigger, existing.get(command.trigger) ?? "0"]),
       );
       if (
-        new Blob([JSON.stringify({ commands: parsed, expectedRevisions })])
-          .size > QUICK_COMMAND_BACKUP_MAX_BYTES
+        new Blob([JSON.stringify({ commands: parsed, expectedRevisions })]).size >
+        QUICK_COMMAND_BACKUP_MAX_BYTES
       )
-        throw new Error(
-          "This backup is too large to import in one request (16 MiB maximum).",
-        );
-      const updated = parsed.filter((command) =>
-        existing.has(command.trigger),
-      ).length;
+        throw new Error("This backup is too large to import in one request (16 MiB maximum).");
+      const updated = parsed.filter((command) => existing.has(command.trigger)).length;
       if (alive.current)
         setPreview({
           commands: parsed,
@@ -235,13 +214,7 @@ export default function QuickCommandBackup({
           disabled={busy || saving}
           onClick={() => setOpen(!open)}
         >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden="true"
-          >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <circle cx="12" cy="5" r="2" />
             <circle cx="12" cy="12" r="2" />
             <circle cx="12" cy="19" r="2" />
@@ -255,11 +228,7 @@ export default function QuickCommandBackup({
             aria-label="Quick command backups"
             className={s.backupMenu}
           >
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => void exportCommands()}
-            >
+            <button type="button" role="menuitem" onClick={() => void exportCommands()}>
               Export commands
             </button>
             <button
@@ -312,19 +281,16 @@ export default function QuickCommandBackup({
         >
           <p className={s.backupFilename}>{preview.filename}</p>
           <p>
-            {preview.commands.length} commands:{" "}
-            <strong>{preview.created} new</strong> and{" "}
+            {preview.commands.length} commands: <strong>{preview.created} new</strong> and{" "}
             <strong>{preview.updated} updates</strong>.
           </p>
           <Notice>
-            Commands with the same trigger will be updated. Their responses and
-            enabled/disabled state will come from the backup. The other{" "}
-            {preview.preserved} existing commands will be kept.
+            Commands with the same trigger will be updated. Their responses and enabled/disabled
+            state will come from the backup. The other {preview.preserved} existing commands will be
+            kept.
           </Notice>
           {failure && <Notice error>{failure}</Notice>}
-          {!writable && (
-            <Notice>Wait for synchronization before importing commands.</Notice>
-          )}
+          {!writable && <Notice>Wait for synchronization before importing commands.</Notice>}
         </Drawer>
       )}
     </>

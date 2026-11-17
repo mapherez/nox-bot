@@ -1,8 +1,4 @@
-import {
-  ControlError,
-  validateId,
-  type DiscordOperationsContract,
-} from "../controlApi.js";
+import { ControlError, validateId, type DiscordOperationsContract } from "../controlApi.js";
 import type { StateStore } from "../core/state.js";
 import type { QuickCommandService } from "../core/quickCommands.js";
 import type { PluginManager } from "../plugins/manager.js";
@@ -24,15 +20,8 @@ export class GuildConfigurationService {
 
   async assertGuild(guildId: string): Promise<void> {
     validateId(guildId);
-    if (
-      !(await this.operations.listGuilds()).some(
-        (guild) => guild.id === guildId,
-      )
-    )
-      throw new ControlError(
-        "GUILD_NOT_FOUND",
-        "The bot is not installed in this server.",
-      );
+    if (!(await this.operations.listGuilds()).some((guild) => guild.id === guildId))
+      throw new ControlError("GUILD_NOT_FOUND", "The bot is not installed in this server.");
   }
 
   snapshot(guildId: string): GuildSnapshot {
@@ -51,9 +40,7 @@ export class GuildConfigurationService {
         version: plugin.version,
         icon: plugin.icon,
         dashboardEntry: plugin.dashboardEntry,
-        configurable:
-          Object.keys(plugin.defaults).length > 0 ||
-          plugin.secretFields.length > 0,
+        configurable: Object.keys(plugin.defaults).length > 0 || plugin.secretFields.length > 0,
         commands: plugin.commands.map(({ name, usage, description }) => ({
           name,
           usage,

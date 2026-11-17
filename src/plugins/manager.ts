@@ -23,12 +23,7 @@ import type { VoiceService } from "../voice/service.js";
 import Logger from "../utils/logger.js";
 import { validateRichContent } from "./richContent.js";
 
-export type RuntimeState =
-  | "inactive"
-  | "starting"
-  | "active"
-  | "error"
-  | "stopping";
+export type RuntimeState = "inactive" | "starting" | "active" | "error" | "stopping";
 type Reply = Extract<ChildMessage, { type: "result" }>["value"];
 type Request = ParentMessage extends infer M
   ? M extends ParentMessage
@@ -52,16 +47,12 @@ class PluginProcess {
     const env: NodeJS.ProcessEnv = { NODE_ENV: "production" };
     for (const name of ["PATH", "SystemRoot", "SYSTEMROOT", "TEMP", "TMP"])
       if (process.env[name]) env[name] = process.env[name];
-    this.child = launch(
-      fileURLToPath(new URL("./worker.js", import.meta.url)),
-      [],
-      {
-        env,
-        execArgv: [],
-        serialization: "advanced",
-        stdio: ["ignore", "ignore", "ignore", "ipc"],
-      },
-    );
+    this.child = launch(fileURLToPath(new URL("./worker.js", import.meta.url)), [], {
+      env,
+      execArgv: [],
+      serialization: "advanced",
+      stdio: ["ignore", "ignore", "ignore", "ipc"],
+    });
     this.child.on("message", (message: unknown) => {
       if (!isRecord(message) || typeof message.requestId !== "string") return;
       const pending = this.pending.get(message.requestId);
@@ -116,8 +107,7 @@ class PluginProcess {
   async stop(): Promise<void> {
     this.disposed = true;
     try {
-      if (this.child.connected && !this.exited)
-        await this.request({ type: "dispose" }, 1500);
+      if (this.child.connected && !this.exited) await this.request({ type: "dispose" }, 1500);
     } catch {
       /* Hard teardown still follows. */
     }
@@ -174,8 +164,7 @@ export class PluginManager extends EventEmitter {
         !definition.icon ||
         !definition.dashboardEntry ||
         !/^\.\/[a-z0-9-]+\/runtime\.js$/.test(definition.runtimeEntry) ||
-        (definition.commands.length === 0 &&
-          !definition.capabilities.includes("voice")) ||
+        (definition.commands.length === 0 && !definition.capabilities.includes("voice")) ||
         typeof definition.validateSettings !== "function" ||
         typeof definition.validateSecrets !== "function"
       )
@@ -183,13 +172,7 @@ export class PluginManager extends EventEmitter {
       if (
         definition.capabilities.some(
           (value) =>
-            ![
-              "http",
-              "attachments",
-              "discord-users",
-              "interactive",
-              "voice",
-            ].includes(value),
+            !["http", "attachments", "discord-users", "interactive", "voice"].includes(value),
         ) ||
         new Set(definition.secretFields).size !== definition.secretFields.length
       )
@@ -200,8 +183,7 @@ export class PluginManager extends EventEmitter {
         ) ||
         new Set(definition.componentHandlers).size !==
           (definition.componentHandlers?.length ?? 0) ||
-        (definition.componentHandlers?.length &&
-          !definition.capabilities.includes("interactive"))
+        (definition.componentHandlers?.length && !definition.capabilities.includes("interactive"))
       )
         throw new Error("Invalid interactive handler declaration.");
       definition.validateSettings(definition.defaults);
@@ -228,9 +210,7 @@ export class PluginManager extends EventEmitter {
             throw new Error("Invalid command option.");
           options.add(option.name);
           if ("required" in option && option.required && optionalSeen)
-            throw new Error(
-              "Required command options must precede optional options.",
-            );
+            throw new Error("Required command options must precede optional options.");
           if (!("required" in option) || !option.required) optionalSeen = true;
           if (
             "autocomplete" in option &&
@@ -298,9 +278,7 @@ export class PluginManager extends EventEmitter {
     return {
       revision: stored?.revision ?? "0",
       enabled:
-        id === "voice"
-          ? (this.voice?.isActive(guildId) ?? false)
-          : (stored?.data.enabled ?? false),
+        id === "voice" ? (this.voice?.isActive(guildId) ?? false) : (stored?.data.enabled ?? false),
       settings: stored?.data.settings ?? structuredClone(definition.defaults),
       secrets: Object.fromEntries(
         definition.secretFields.map((field) => [
@@ -314,16 +292,10 @@ export class PluginManager extends EventEmitter {
           : stored?.data.enabled && this.installedGuilds().has(guildId)
             ? this.runtimeStatus(id).state
             : "inactive",
-      error:
-        id === "voice" || stored?.data.enabled
-          ? this.runtimeStatus(id).error
-          : undefined,
+      error: id === "voice" || stored?.data.enabled ? this.runtimeStatus(id).error : undefined,
     };
   }
-  private decrypt(
-    definition: PluginDefinition,
-    config: GuildPlugin,
-  ): Record<string, string> {
+  private decrypt(definition: PluginDefinition, config: GuildPlugin): Record<string, string> {
     return Object.fromEntries(
       Object.entries(config.secrets).map(([field, value]) => [
         field,
@@ -349,13 +321,11 @@ export class PluginManager extends EventEmitter {
     for (const [field, value] of Object.entries(input.secrets ?? {})) {
       if (
         !definition.secretFields.includes(field) ||
-        (value !== null &&
-          (typeof value !== "string" || !value.trim() || value.length > 4096))
+        (value !== null && (typeof value !== "string" || !value.trim() || value.length > 4096))
       )
         throw new Error("Invalid plugin secret.");
       if (value === null) delete secrets[field];
-      else
-        secrets[field] = this.vault.encrypt(value.trim(), guildId, id, field);
+      else secrets[field] = this.vault.encrypt(value.trim(), guildId, id, field);
     }
     const config: GuildPlugin = {
       guildId,
@@ -364,10 +334,8 @@ export class PluginManager extends EventEmitter {
       settings: definition.validateSettings(input.settings),
       secrets,
     };
-    if (id === "voice" && this.voice)
-      await this.voice.validateChannel(guildId, config.settings);
-    if (config.enabled)
-      definition.validateSecrets(this.decrypt(definition, config));
+    if (id === "voice" && this.voice) await this.voice.validateChannel(guildId, config.settings);
+    if (config.enabled) definition.validateSecrets(this.decrypt(definition, config));
     await this.state.put("plugin", guildId, id, config, input.expectedRevision);
   }
   setEnabled(
@@ -376,8 +344,7 @@ export class PluginManager extends EventEmitter {
     enabled: boolean,
     expectedRevision: string,
   ): Promise<void> {
-    if (id !== "voice")
-      return this.setEnabledNow(id, guildId, enabled, expectedRevision);
+    if (id !== "voice") return this.setEnabledNow(id, guildId, enabled, expectedRevision);
     // Keep the enable handshake and its confirmed write together. A competing stale
     // toggle must not disconnect a conversation successfully enabled by an earlier request.
     const work = this.voiceMutation.then(() =>
@@ -401,9 +368,7 @@ export class PluginManager extends EventEmitter {
       guildId,
       pluginId: id,
       enabled,
-      settings: definition.validateSettings(
-        previous?.settings ?? definition.defaults,
-      ),
+      settings: definition.validateSettings(previous?.settings ?? definition.defaults),
       secrets: { ...previous?.secrets },
     };
     if (enabled) definition.validateSecrets(this.decrypt(definition, config));
@@ -414,14 +379,8 @@ export class PluginManager extends EventEmitter {
           "STATE_UNAVAILABLE",
           "Configuration changes are temporarily unavailable.",
         );
-      if (
-        (this.state.get("plugin", guildId, id)?.revision ?? "0") !==
-        expectedRevision
-      )
-        throw new StateError(
-          "STATE_CONFLICT",
-          "Configuration changed. Refresh and try again.",
-        );
+      if ((this.state.get("plugin", guildId, id)?.revision ?? "0") !== expectedRevision)
+        throw new StateError("STATE_CONFLICT", "Configuration changed. Refresh and try again.");
       if (enabled) await this.voice.enable(guildId, config.settings);
       else await this.voice.disable(guildId);
       try {
@@ -476,8 +435,7 @@ export class PluginManager extends EventEmitter {
           )
           .map((row) => row.data.guildId),
       );
-      const changed =
-        [...desired].sort().join(",") !== [...plugin.guilds].sort().join(",");
+      const changed = [...desired].sort().join(",") !== [...plugin.guilds].sort().join(",");
       if (!desired.size) {
         clearTimeout(plugin.retry);
         plugin.retry = undefined;
@@ -494,15 +452,9 @@ export class PluginManager extends EventEmitter {
       }
       try {
         for (const guildId of desired) {
-          const config = this.state.get(
-            "plugin",
-            guildId,
-            plugin.definition.id,
-          )!.data;
+          const config = this.state.get("plugin", guildId, plugin.definition.id)!.data;
           plugin.definition.validateSettings(config.settings);
-          plugin.definition.validateSecrets(
-            this.decrypt(plugin.definition, config),
-          );
+          plugin.definition.validateSecrets(this.decrypt(plugin.definition, config));
         }
         plugin.guilds = desired;
         if (!plugin.process && plugin.status !== "error" && !plugin.retry)
@@ -514,8 +466,7 @@ export class PluginManager extends EventEmitter {
           });
       } catch {
         plugin.status = "error";
-        plugin.error =
-          "Plugin configuration or runtime could not be activated.";
+        plugin.error = "Plugin configuration or runtime could not be activated.";
         if (plugin.process) {
           await plugin.process.stop();
           plugin.process = undefined;
@@ -525,22 +476,15 @@ export class PluginManager extends EventEmitter {
     this.emit("change");
   }
   private async activate(plugin: ManagedPlugin): Promise<void> {
-    await access(
-      fileURLToPath(new URL(plugin.definition.runtimeEntry, import.meta.url)),
-    );
+    await access(fileURLToPath(new URL(plugin.definition.runtimeEntry, import.meta.url)));
     plugin.status = "starting";
     plugin.error = undefined;
-    const child = new PluginProcess(
-      () => this.crashed(plugin, child),
-      this.launch,
-    );
+    const child = new PluginProcess(() => this.crashed(plugin, child), this.launch);
     plugin.process = child;
     await child.request(
       {
         type: "initialize",
-        entry: fileURLToPath(
-          new URL(plugin.definition.runtimeEntry, import.meta.url),
-        ),
+        entry: fileURLToPath(new URL(plugin.definition.runtimeEntry, import.meta.url)),
         handlers: plugin.definition.commands.map((c) => c.handler),
         componentHandlers: plugin.definition.componentHandlers ?? [],
         guilds: [...plugin.guilds],
@@ -561,13 +505,7 @@ export class PluginManager extends EventEmitter {
     this.scheduleRecovery(plugin);
   }
   private scheduleRecovery(plugin: ManagedPlugin): void {
-    if (
-      this.stopping ||
-      !plugin.guilds.size ||
-      plugin.retries >= 3 ||
-      plugin.retry
-    )
-      return;
+    if (this.stopping || !plugin.guilds.size || plugin.retries >= 3 || plugin.retry) return;
     const delay = 1000 * 2 ** plugin.retries++;
     plugin.retry = setTimeout(() => {
       plugin.retry = undefined;
@@ -605,8 +543,7 @@ export class PluginManager extends EventEmitter {
       settings: config.settings,
       secrets: this.decrypt(plugin.definition, config),
     };
-    if (!plugin.definition.capabilities.includes("discord-users"))
-      fullContext.users = {};
+    if (!plugin.definition.capabilities.includes("discord-users")) fullContext.users = {};
     const result = await plugin.process!.request({
       type,
       handler,

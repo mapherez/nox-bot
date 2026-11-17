@@ -13,9 +13,8 @@ export default function DictionaryPanel({ plugin }: PluginPanelProps) {
       <section>
         <h3>Made for Portuguese</h3>
         <p>
-          Accent correction uses the bundled Portuguese dictionary. Definitions
-          include images when available, with a direct Priberam link as a
-          fallback.
+          Accent correction uses the bundled Portuguese dictionary. Definitions include images when
+          available, with a direct Priberam link as a fallback.
         </p>
         <div className={s.commandPreview}>
           <code>/definition word:coração</code>
@@ -25,8 +24,8 @@ export default function DictionaryPanel({ plugin }: PluginPanelProps) {
       <section>
         <h3>Ready to use</h3>
         <p>
-          No API key or server settings are required. Enable {plugin.name} from
-          the Plugins page to make its command available.
+          No API key or server settings are required. Enable {plugin.name} from the Plugins page to
+          make its command available.
         </p>
       </section>
     </div>

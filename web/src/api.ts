@@ -18,8 +18,7 @@ export async function request<T>(
     headers: options
       ? { "Content-Type": "application/json", "X-CSRF-Token": options.csrf }
       : undefined,
-    body:
-      options?.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: options?.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
   const data: unknown = await response.json();
   if (!response.ok) {

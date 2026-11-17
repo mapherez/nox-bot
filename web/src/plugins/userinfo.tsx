@@ -13,8 +13,8 @@ export default function UserInfoPanel(_: PluginPanelProps) {
       <section>
         <h3>Member profile</h3>
         <p>
-          View account creation, server join date, avatar and roles. Without a
-          selected user, the command shows your own profile.
+          View account creation, server join date, avatar and roles. Without a selected user, the
+          command shows your own profile.
         </p>
         <div className={s.commandPreview}>
           <code>/userinfo user:@member</code>
@@ -23,10 +23,7 @@ export default function UserInfoPanel(_: PluginPanelProps) {
       </section>
       <section>
         <h3>No configuration needed</h3>
-        <p>
-          Member information comes directly from Discord and stays scoped to
-          this server.
-        </p>
+        <p>Member information comes directly from Discord and stays scoped to this server.</p>
       </section>
     </div>
   );

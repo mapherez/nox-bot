@@ -15,10 +15,7 @@ export function createJsonHttpHandler(
   return {
     ...handler,
     async fetch(request, context) {
-      if (
-        request.method !== "POST" ||
-        !(await isLegacyRequest(request, context?.parsedBody))
-      )
+      if (request.method !== "POST" || !(await isLegacyRequest(request, context?.parsedBody)))
         return handler.fetch(request, context);
 
       // The TS SDK requires both Accept values even with enableJsonResponse.
@@ -64,10 +61,7 @@ export function createJsonHttpHandler(
           cancel();
           return await cancelled;
         }
-        return await Promise.race([
-          transport.handleRequest(internal, context),
-          cancelled,
-        ]);
+        return await Promise.race([transport.handleRequest(internal, context), cancelled]);
       } finally {
         active.delete(cancel);
         request.signal.removeEventListener("abort", cancel);
@@ -88,13 +82,9 @@ function acceptsJson(accept: string | null): boolean {
   let quality = 0;
   for (const range of accept.toLowerCase().split(",")) {
     const [media, ...parameters] = range.trim().split(";");
-    const specificity = ["*/*", "application/*", "application/json"].indexOf(
-      media.trim(),
-    );
+    const specificity = ["*/*", "application/*", "application/json"].indexOf(media.trim());
     if (specificity < 0 || specificity < best) continue;
-    const weight = parameters.find((parameter) =>
-      parameter.trim().startsWith("q="),
-    );
+    const weight = parameters.find((parameter) => parameter.trim().startsWith("q="));
     const q = weight ? Number(weight.trim().slice(2)) : 1;
     if (specificity > best) quality = 0;
     best = specificity;

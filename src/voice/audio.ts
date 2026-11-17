@@ -8,9 +8,7 @@ const coefficients = Array.from({ length: TAPS }, (_, i) => {
   const x = i - (TAPS - 1) / 2,
     cutoff = 0.225;
   return (
-    (x === 0
-      ? 2 * cutoff
-      : Math.sin(2 * Math.PI * cutoff * x) / (Math.PI * x)) *
+    (x === 0 ? 2 * cutoff : Math.sin(2 * Math.PI * cutoff * x) / (Math.PI * x)) *
     (0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (TAPS - 1)))
   );
 });
@@ -24,8 +22,7 @@ export class DiscordDownsampler {
     if (pcm.length % 4) throw new Error("Invalid stereo PCM");
     const output: number[] = [];
     for (let i = 0; i < pcm.length; i += 4) {
-      this.history[this.position] =
-        (pcm.readInt16LE(i) + pcm.readInt16LE(i + 2)) / 65536;
+      this.history[this.position] = (pcm.readInt16LE(i) + pcm.readInt16LE(i + 2)) / 65536;
       this.position = (this.position + 1) % TAPS;
       if (this.phase++ % 2) continue;
       let value = 0;
@@ -45,11 +42,9 @@ export class InputMixer {
   push(id: string, samples: Float32Array, now = performance.now()): void {
     let speaker = this.speakers.get(id);
     // Discard the tail of an old utterance instead of playing it after a pause.
-    if (!speaker || now - speaker.lastPacket > 160)
-      speaker = { samples: [], lastPacket: now };
+    if (!speaker || now - speaker.lastPacket > 160) speaker = { samples: [], lastPacket: now };
     speaker.lastPacket = now;
-    for (const sample of samples)
-      speaker.samples.push(Number.isFinite(sample) ? sample : 0);
+    for (const sample of samples) speaker.samples.push(Number.isFinite(sample) ? sample : 0);
     if (speaker.samples.length > MAX_SAMPLES)
       speaker.samples.splice(0, speaker.samples.length - MAX_SAMPLES);
     this.speakers.set(id, speaker);

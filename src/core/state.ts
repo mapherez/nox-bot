@@ -1,11 +1,7 @@
 import { EventEmitter } from "node:events";
-import {
-  validateStateDocument,
-  validateStateValue,
-} from "../shared/stateValidation.js";
+import { validateStateDocument, validateStateValue } from "../shared/stateValidation.js";
 
-export type Json =
-  null | boolean | number | string | Json[] | { [key: string]: Json };
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type Settings = Record<string, Json>;
 export interface GuildConfig {
   guildId: string;
@@ -66,14 +62,9 @@ export interface StateChange {
   value: string | null;
   expectedRevision: bigint;
 }
-export type SyncState =
-  "starting" | "synced" | "reconnecting" | "recovering" | "closed";
+export type SyncState = "starting" | "synced" | "reconnecting" | "recovering" | "closed";
 export interface TransportCallbacks {
-  snapshot(
-    rows: readonly StateRow[],
-    sequence: bigint,
-    generation: number,
-  ): Promise<void>;
+  snapshot(rows: readonly StateRow[], sequence: bigint, generation: number): Promise<void>;
   disconnected(): void;
   recovering(): void;
 }
@@ -94,14 +85,12 @@ export class StateError extends Error {
     super(message);
   }
 }
-export const stateKey = (kind: EntityKind, guildId: string, id = "") =>
-  `${kind}:${guildId}:${id}`;
+export const stateKey = (kind: EntityKind, guildId: string, id = "") => `${kind}:${guildId}:${id}`;
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 export function isJson(value: unknown): value is Json {
-  if (value === null || typeof value === "string" || typeof value === "boolean")
-    return true;
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
   if (typeof value === "number") return Number.isFinite(value);
   return Array.isArray(value)
     ? value.every(isJson)
@@ -116,13 +105,10 @@ export function validateEntity<K extends EntityKind>(
   } catch {
     throw new StateError("INVALID_STATE", `Invalid ${kind} state.`);
   }
-  if (!isRecord(value))
-    throw new StateError("INVALID_STATE", "State value must be an object.");
+  if (!isRecord(value)) throw new StateError("INVALID_STATE", "State value must be an object.");
   const text = (key: string) => typeof value[key] === "string";
   const time = (key: string) =>
-    typeof value[key] === "number" &&
-    Number.isSafeInteger(value[key]) &&
-    value[key] >= 0;
+    typeof value[key] === "number" && Number.isSafeInteger(value[key]) && value[key] >= 0;
   let valid: boolean;
   switch (kind) {
     case "guild":
@@ -208,8 +194,7 @@ export class StateStore extends EventEmitter {
   }
   start(): Promise<void> {
     return (this.opening ??= this.transport.connect({
-      snapshot: (rows, sequence, generation) =>
-        this.apply(rows, sequence, generation),
+      snapshot: (rows, sequence, generation) => this.apply(rows, sequence, generation),
       disconnected: () => {
         ++this.connectionEpoch;
         this.setSync("reconnecting");
@@ -220,11 +205,7 @@ export class StateStore extends EventEmitter {
       },
     }));
   }
-  private apply(
-    rows: readonly StateRow[],
-    sequence: bigint,
-    generation: number,
-  ): Promise<void> {
+  private apply(rows: readonly StateRow[], sequence: bigint, generation: number): Promise<void> {
     const epoch = this.connectionEpoch;
     const work = this.applying.then(async () => {
       if (
@@ -236,29 +217,12 @@ export class StateStore extends EventEmitter {
         return;
       const next = new Map<string, StateRow>();
       for (const row of rows) {
-        if (
-          ![
-            "guild",
-            "plugin",
-            "quick",
-            "user",
-            "session",
-            "migration",
-          ].includes(row.kind)
-        )
+        if (!["guild", "plugin", "quick", "user", "session", "migration"].includes(row.kind))
           throw new StateError("INVALID_STATE", "Unknown state kind.");
         try {
-          validateStateDocument(
-            row.kind,
-            row.guildId,
-            row.key,
-            JSON.parse(row.value),
-          );
+          validateStateDocument(row.kind, row.guildId, row.key, JSON.parse(row.value));
         } catch {
-          throw new StateError(
-            "INVALID_STATE",
-            "Invalid confirmed state document.",
-          );
+          throw new StateError("INVALID_STATE", "Invalid confirmed state document.");
         }
         if (next.has(row.key) || row.revision < 1n || row.revision > sequence)
           throw new StateError("INVALID_STATE", "Invalid confirmed revision.");
@@ -275,8 +239,7 @@ export class StateStore extends EventEmitter {
       // Swap the entire snapshot before starting lifecycle work. Consumers never see half a transaction.
       for (const project of this.projections) await project();
       // A socket loss while projections run must not re-open writes.
-      if (epoch === this.connectionEpoch && this.sync === "recovering")
-        this.setSync("synced");
+      if (epoch === this.connectionEpoch && this.sync === "recovering") this.setSync("synced");
       this.emit("change");
     });
     this.applying = work.catch(() => {});
@@ -286,14 +249,9 @@ export class StateStore extends EventEmitter {
     kind: K,
     guildId?: string,
   ): Array<{ key: string; revision: string; data: Entities[K] }> {
-    const result: Array<{ key: string; revision: string; data: Entities[K] }> =
-      [];
+    const result: Array<{ key: string; revision: string; data: Entities[K] }> = [];
     for (const row of this.rows.values()) {
-      if (
-        row.kind !== kind ||
-        (guildId !== undefined && row.guildId !== guildId)
-      )
-        continue;
+      if (row.kind !== kind || (guildId !== undefined && row.guildId !== guildId)) continue;
       const data: unknown = JSON.parse(row.value);
       validateEntity(kind, data);
       result.push({ key: row.key, revision: row.revision.toString(), data });
@@ -318,16 +276,10 @@ export class StateStore extends EventEmitter {
     data: Entities[K] | null,
     expectedRevision: string,
   ): StateChange {
-    if (!/^\d+$/.test(expectedRevision))
-      throw new StateError("INVALID_STATE", "Invalid revision.");
+    if (!/^\d+$/.test(expectedRevision)) throw new StateError("INVALID_STATE", "Invalid revision.");
     if (data !== null) validateEntity(kind, data);
     try {
-      validateStateDocument(
-        kind,
-        guildId,
-        stateKey(kind, guildId, id),
-        data ?? undefined,
-      );
+      validateStateDocument(kind, guildId, stateKey(kind, guildId, id), data ?? undefined);
     } catch {
       throw new StateError("INVALID_STATE", "Invalid state namespace.");
     }

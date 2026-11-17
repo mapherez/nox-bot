@@ -22,9 +22,7 @@ export default function VoicePanel({
   save,
 }: PluginPanelProps) {
   const base = `/dashboard/api/guilds/${guildId}/voice`;
-  const [channel, setChannel] = useState(
-    String(plugin.configuration.settings.channelId ?? ""),
-  );
+  const [channel, setChannel] = useState(String(plugin.configuration.settings.channelId ?? ""));
   const [channels, setChannels] = useState<VoiceChannel[]>([]);
   const [status, setStatus] = useState<VoiceStatus>();
   const [settings, setSettings] = useState<VoiceSettings>();
@@ -39,10 +37,7 @@ export default function VoicePanel({
     !!settings &&
     !!status?.settings &&
     JSON.stringify(settings) !== JSON.stringify(status.settings);
-  useEffect(
-    () => onDirty(channelDirty || engineDirty),
-    [channelDirty, engineDirty, onDirty],
-  );
+  useEffect(() => onDirty(channelDirty || engineDirty), [channelDirty, engineDirty, onDirty]);
   const refresh = useCallback(async () => {
     if (polling.current) return;
     polling.current = true;
@@ -99,9 +94,7 @@ export default function VoicePanel({
     });
     if (alive.current) {
       setSettings(value);
-      setStatus((current) =>
-        current ? { ...current, settings: value } : current,
-      );
+      setStatus((current) => (current ? { ...current, settings: value } : current));
     }
   };
   const submit = async (event: React.FormEvent) => {
@@ -124,19 +117,14 @@ export default function VoicePanel({
       });
     });
   const locked = !writable || busy || saving;
-  const otherConversation =
-    !!status?.engine?.conversationActive && !status.ownsConversation;
+  const otherConversation = !!status?.engine?.conversationActive && !status.ownsConversation;
   return (
-    <form
-      id="plugin-settings"
-      className={s.form}
-      onSubmit={(event) => void submit(event)}
-    >
+    <form id="plugin-settings" className={s.form} onSubmit={(event) => void submit(event)}>
       <section>
         <h3>Discord voice channel</h3>
         <p className={s.hint}>
-          Everyone in this channel can talk to the bot and hear its replies.
-          Audio is processed live; conversations are not recorded.
+          Everyone in this channel can talk to the bot and hear its replies. Audio is processed
+          live; conversations are not recorded.
         </p>
         <label htmlFor="voice-channel">Channel</label>
         <select
@@ -154,17 +142,14 @@ export default function VoicePanel({
           ))}
         </select>
         <p className={s.hint}>
-          Save the channel, then enable the plugin from its card. The
-          nox-voice-mlx service must already be ready and free. Changing
-          channels starts a fresh conversation.
+          Save the channel, then enable the plugin from its card. The nox-voice-mlx service must
+          already be ready and free. Changing channels starts a fresh conversation.
         </p>
       </section>
       <section>
         <div className={s.sectionHeading}>
           <h3>Connection and engine</h3>
-          <Badge tone={status?.active ? "green" : "muted"}>
-            {status?.state ?? "Checking…"}
-          </Badge>
+          <Badge tone={status?.active ? "green" : "muted"}>{status?.state ?? "Checking…"}</Badge>
         </div>
         <p>
           Controller: {status?.controller ?? "checking"} · Engine:{" "}
@@ -172,8 +157,8 @@ export default function VoicePanel({
         </p>
         {status?.engine && (
           <p className={s.hint}>
-            Memory: {(status.engine.memoryBytes / 1073741824).toFixed(1)} GiB ·
-            Uptime: {Math.floor(status.engine.uptimeSeconds / 60)} min
+            Memory: {(status.engine.memoryBytes / 1073741824).toFixed(1)} GiB · Uptime:{" "}
+            {Math.floor(status.engine.uptimeSeconds / 60)} min
           </p>
         )}
         {(status?.error || status?.engine?.error) && (
@@ -181,8 +166,8 @@ export default function VoicePanel({
         )}
         {otherConversation && (
           <Notice>
-            The voice service is in use by another conversation. End it before
-            changing engine settings.
+            The voice service is in use by another conversation. End it before changing engine
+            settings.
           </Notice>
         )}
         <div className={s.rowActions}>
@@ -218,9 +203,9 @@ export default function VoicePanel({
           </button>
         </div>
         <p className={s.hint}>
-          Starting the engine does not enable voice. Stopping or restarting it
-          disconnects Discord voice; enable the plugin again afterwards.
-          Disabling the plugin leaves the voice service running.
+          Starting the engine does not enable voice. Stopping or restarting it disconnects Discord
+          voice; enable the plugin again afterwards. Disabling the plugin leaves the voice service
+          running.
         </p>
         <button
           type="button"
@@ -235,17 +220,14 @@ export default function VoicePanel({
           Test connection and diagnostics
         </button>
         {diagnostics !== undefined && (
-          <pre className={s.voiceDiagnostics}>
-            {JSON.stringify(diagnostics, null, 2)}
-          </pre>
+          <pre className={s.voiceDiagnostics}>{JSON.stringify(diagnostics, null, 2)}</pre>
         )}
       </section>
       <section>
         <h3>Voice settings</h3>
         <p className={s.hint}>
-          Shared with the dedicated NoX Voice webapp. Applying settings during
-          Discord voice starts a fresh conversation while keeping the bot in the
-          channel.
+          Shared with the dedicated NoX Voice webapp. Applying settings during Discord voice starts
+          a fresh conversation while keeping the bot in the channel.
         </p>
         {settings ? (
           <>
@@ -254,9 +236,7 @@ export default function VoicePanel({
               id="voice-name"
               value={settings.voice}
               disabled={locked || otherConversation}
-              onChange={(event) =>
-                setSettings({ ...settings, voice: event.target.value })
-              }
+              onChange={(event) => setSettings({ ...settings, voice: event.target.value })}
             >
               {voiceNames.map((name) => (
                 <option key={name} value={name}>
@@ -271,18 +251,14 @@ export default function VoicePanel({
               rows={5}
               value={settings.prompt}
               disabled={locked || otherConversation}
-              onChange={(event) =>
-                setSettings({ ...settings, prompt: event.target.value })
-              }
+              onChange={(event) => setSettings({ ...settings, prompt: event.target.value })}
             />
             <label htmlFor="voice-bits">Quantization</label>
             <select
               id="voice-bits"
               value={settings.bits}
               disabled={locked || otherConversation}
-              onChange={(event) =>
-                setSettings({ ...settings, bits: Number(event.target.value) })
-              }
+              onChange={(event) => setSettings({ ...settings, bits: Number(event.target.value) })}
             >
               {quantizationBits.map((bits) => (
                 <option key={bits} value={bits}>
@@ -290,23 +266,16 @@ export default function VoicePanel({
                 </option>
               ))}
             </select>
-            <p className={s.hint}>
-              Quantization changes memory use and can affect voice quality.
-            </p>
+            <p className={s.hint}>Quantization changes memory use and can affect voice quality.</p>
             <button
               type="button"
               className={s.primary}
               disabled={
-                locked ||
-                !engineDirty ||
-                otherConversation ||
-                status?.engine?.settingsChanging
+                locked || !engineDirty || otherConversation || status?.engine?.settingsChanging
               }
               onClick={() => void operation(apply)}
             >
-              {status?.ownsConversation
-                ? "Apply and restart conversation"
-                : "Apply voice settings"}
+              {status?.ownsConversation ? "Apply and restart conversation" : "Apply voice settings"}
             </button>
             <button
               type="button"
@@ -327,8 +296,7 @@ export default function VoicePanel({
           </>
         ) : (
           <p className={s.hint}>
-            Voice settings will appear when the nox-voice-mlx controller is
-            available.
+            Voice settings will appear when the nox-voice-mlx controller is available.
           </p>
         )}
       </section>
@@ -336,8 +304,7 @@ export default function VoicePanel({
       {error && <Notice error>{error}</Notice>}
       {!writable && (
         <Notice>
-          Reconnecting — configuration changes temporarily unavailable. Your
-          draft is kept here.
+          Reconnecting — configuration changes temporarily unavailable. Your draft is kept here.
         </Notice>
       )}
       <button type="submit" hidden disabled={locked}>

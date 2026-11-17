@@ -14,32 +14,53 @@ const configEnv = (origin = "https://bot.example.com") => ({
   NOX_BOT_SESSION_SECRET: randomBytes(32).toString("base64"),
 });
 
-test("dashboard origins allow HTTPS, loopback HTTP and private LAN HTTP only", () => {
+void test("dashboard origins allow HTTPS, loopback HTTP and private LAN HTTP only", () => {
   for (const origin of [
-    "https://bot.example.com", "https://8.8.8.8:3200", "https://192.168.1.50:3200",
-    "http://localhost:3200", "http://127.0.0.1", "http://127.255.255.254:3200",
-    "http://[::1]:3200", "http://[0:0:0:0:0:0:0:1]:3200",
-    "http://10.0.0.1:3200", "http://10.255.255.254:3200",
-    "http://172.16.0.1:3200", "http://172.31.255.254:3200",
-    "http://192.168.0.1:3200", "http://192.168.255.254:3200",
-    "http://[fc00::1]:3200", "http://[fdff:ffff::1]:3200",
+    "https://bot.example.com",
+    "https://8.8.8.8:3200",
+    "https://192.168.1.50:3200",
+    "http://localhost:3200",
+    "http://127.0.0.1",
+    "http://127.255.255.254:3200",
+    "http://[::1]:3200",
+    "http://[0:0:0:0:0:0:0:1]:3200",
+    "http://10.0.0.1:3200",
+    "http://10.255.255.254:3200",
+    "http://172.16.0.1:3200",
+    "http://172.31.255.254:3200",
+    "http://192.168.0.1:3200",
+    "http://192.168.255.254:3200",
+    "http://[fc00::1]:3200",
+    "http://[fdff:ffff::1]:3200",
   ]) {
     assert.equal(loadAuthConfig(configEnv(origin)).origin, new URL(origin).origin, origin);
   }
   for (const origin of [
-    "http://bot.example.com", "http://8.8.8.8:3200", "http://0.0.0.0:3200",
-    "http://172.15.255.254", "http://172.32.0.1", "http://192.167.1.1", "http://192.169.1.1",
-    "http://localhost.example.com", "http://192.168.1.50.example.com", "http://10.example.com",
-    "http://[2001:db8::1]:3200", "http://[fbff::1]:3200", "http://[fe00::1]:3200",
-    "ftp://192.168.1.50", "http://owner:password@192.168.1.50:3200",
-    "http://192.168.1.50:3200/dashboard", "http://192.168.1.50:3200/?q=1",
-    "http://192.168.1.50:3200/#fragment", "not a URL",
+    "http://bot.example.com",
+    "http://8.8.8.8:3200",
+    "http://0.0.0.0:3200",
+    "http://172.15.255.254",
+    "http://172.32.0.1",
+    "http://192.167.1.1",
+    "http://192.169.1.1",
+    "http://localhost.example.com",
+    "http://192.168.1.50.example.com",
+    "http://10.example.com",
+    "http://[2001:db8::1]:3200",
+    "http://[fbff::1]:3200",
+    "http://[fe00::1]:3200",
+    "ftp://192.168.1.50",
+    "http://owner:password@192.168.1.50:3200",
+    "http://192.168.1.50:3200/dashboard",
+    "http://192.168.1.50:3200/?q=1",
+    "http://192.168.1.50:3200/#fragment",
+    "not a URL",
   ]) {
     assert.throws(() => loadAuthConfig(configEnv(origin)), undefined, origin);
   }
 });
 
-test("LAN login retains owner authorization, cookie flags and exact CSRF origin", async (t) => {
+void test("LAN login retains owner authorization, cookie flags and exact CSRF origin", async (t) => {
   const { state } = await memoryState(t);
   const config = loadAuthConfig(configEnv("http://192.168.1.50:3200"));
   const discord = new DiscordOAuth(config);
@@ -61,9 +82,18 @@ test("LAN login retains owner authorization, cookie flags and exact CSRF origin"
   assert.doesNotMatch(signed.cookie, /; Secure/);
   assert.equal(auth.authenticate(signed.cookie.split(";")[0].split("=")[1]).userId, "7");
   auth.validateMutation(signed.session, config.origin, signed.session.csrf);
-  for (const origin of ["http://192.168.1.51:3200", "http://192.168.1.50:3201", "https://192.168.1.50:3200", undefined])
-    assert.throws(() => auth.validateMutation(signed.session, origin, signed.session.csrf), { code: "CSRF_INVALID" });
-  assert.throws(() => auth.validateMutation(signed.session, config.origin, "invalid"), { code: "CSRF_INVALID" });
+  for (const origin of [
+    "http://192.168.1.51:3200",
+    "http://192.168.1.50:3201",
+    "https://192.168.1.50:3200",
+    undefined,
+  ])
+    assert.throws(() => auth.validateMutation(signed.session, origin, signed.session.csrf), {
+      code: "CSRF_INVALID",
+    });
+  assert.throws(() => auth.validateMutation(signed.session, config.origin, "invalid"), {
+    code: "CSRF_INVALID",
+  });
   userId = "8";
   const denied = new URL(auth.beginLogin().url).searchParams.get("state");
   await assert.rejects(auth.completeLogin("code", denied, denied), { code: "ACCESS_DENIED" });
@@ -73,18 +103,17 @@ test("LAN login retains owner authorization, cookie flags and exact CSRF origin"
   assert.equal(httpsAuth.sessionCookieName, "__Host-nox-session");
   const httpsLogin = httpsAuth.beginLogin();
   assert.match(httpsLogin.stateCookie, /; Secure/);
-  assert.equal(new URL(httpsLogin.url).searchParams.get("redirect_uri"), `${httpsConfig.origin}/auth/callback`);
+  assert.equal(
+    new URL(httpsLogin.url).searchParams.get("redirect_uri"),
+    `${httpsConfig.origin}/auth/callback`,
+  );
 });
 
-test("owner configuration, expiring OAuth state, session rotation and rolling one-year expiry are enforced", async (t) => {
+void test("owner configuration, expiring OAuth state, session rotation and rolling one-year expiry are enforced", async (t) => {
   const { state } = await memoryState(t);
   const env = configEnv();
-  assert.throws(() =>
-    loadAuthConfig({ ...env, NOX_BOT_OWNER_DISCORD_USER_ID: undefined }),
-  );
-  assert.throws(() =>
-    loadAuthConfig({ ...env, NOX_BOT_PUBLIC_URL: "http://bot.example.com" }),
-  );
+  assert.throws(() => loadAuthConfig({ ...env, NOX_BOT_OWNER_DISCORD_USER_ID: undefined }));
+  assert.throws(() => loadAuthConfig({ ...env, NOX_BOT_PUBLIC_URL: "http://bot.example.com" }));
   let clock = 1000000,
     identified = 0;
   const auth = new AuthService(
@@ -102,10 +131,9 @@ test("owner configuration, expiring OAuth state, session rotation and rolling on
   await auth.initializeOwner();
   const begin = () => new URL(auth.beginLogin().url).searchParams.get("state");
   let login = begin();
-  await assert.rejects(
-    auth.completeLogin("code", login, "different-browser-state"),
-    { code: "OAUTH_STATE_INVALID" },
-  );
+  await assert.rejects(auth.completeLogin("code", login, "different-browser-state"), {
+    code: "OAUTH_STATE_INVALID",
+  });
   await assert.rejects(auth.completeLogin("code", login, login), {
     code: "OAUTH_STATE_INVALID",
   });
@@ -138,7 +166,7 @@ test("owner configuration, expiring OAuth state, session rotation and rolling on
   assert.throws(() => auth.authenticate(active), { code: "SESSION_EXPIRED" });
 });
 
-test("cookie renewal follows confirmed expiry during outages and failed writes, then recovers", async (t) => {
+void test("cookie renewal follows confirmed expiry during outages and failed writes, then recovers", async (t) => {
   for (const failure of ["offline", "write-failed"]) {
     await t.test(failure, async (t) => {
       const f = await memoryState(t);
@@ -155,7 +183,10 @@ test("cookie renewal follows confirmed expiry during outages and failed writes, 
       const token = signed.cookie.split(";")[0].split("=")[1];
       const mutate = f.transport.mutate;
       if (failure === "offline") f.disconnect();
-      else f.transport.mutate = async () => { throw new Error("write failed"); };
+      else
+        f.transport.mutate = async () => {
+          throw new Error("write failed");
+        };
       clock += 6 * 24 * 60 * 60 * 1000;
       auth.authenticate(token);
       const unchanged = await auth.refreshSession(token);

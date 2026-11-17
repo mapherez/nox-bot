@@ -6,8 +6,5 @@ const entries = import.meta.glob<{
 export const panels = Object.fromEntries(
   Object.entries(entries)
     .filter(([path]) => !path.endsWith("/types.tsx"))
-    .map(([path, loader]) => [
-      path.split("/").pop()!.replace(".tsx", ""),
-      lazy(loader),
-    ]),
+    .map(([path, loader]) => [path.split("/").pop()!.replace(".tsx", ""), lazy(loader)]),
 );

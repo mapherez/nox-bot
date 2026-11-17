@@ -1,10 +1,6 @@
 import { EventEmitter } from "node:events";
 import type { Settings } from "../core/state.js";
-import type {
-  EngineStatus,
-  VoiceSettings,
-  VoiceStatus,
-} from "../shared/voice.js";
+import type { EngineStatus, VoiceSettings, VoiceStatus } from "../shared/voice.js";
 import { quantizationBits, voiceNames } from "../shared/voice.js";
 import type { Controller } from "./controller.js";
 import type { Conversation, VoiceDiscord } from "./discord.js";
@@ -15,9 +11,7 @@ export function validateVoiceSettings(value: unknown): VoiceSettings {
     throw new VoiceError("Invalid voice settings.", 400);
   const data = value as Record<string, unknown>;
   if (
-    Object.keys(data).some(
-      (key) => !["voice", "prompt", "bits"].includes(key),
-    ) ||
+    Object.keys(data).some((key) => !["voice", "prompt", "bits"].includes(key)) ||
     !voiceNames.includes(data.voice as (typeof voiceNames)[number]) ||
     typeof data.prompt !== "string" ||
     data.prompt.length > 4096 ||
@@ -81,10 +75,7 @@ export class VoiceService extends EventEmitter {
   async validateChannel(guildId: string, settings: Settings) {
     const channelId = settings.channelId;
     if (typeof channelId !== "string" || !/^\d{1,20}$/.test(channelId))
-      throw new VoiceError(
-        "Select and save a voice channel before enabling NoX Voice.",
-        400,
-      );
+      throw new VoiceError("Select and save a voice channel before enabling NoX Voice.", 400);
     await this.discord.validate(guildId, channelId);
     return channelId;
   }
@@ -94,25 +85,19 @@ export class VoiceService extends EventEmitter {
       active: this.isActive(guildId),
       state: this.state,
       error: this.error,
-      channelId:
-        this.session?.guildId === guildId ? this.session.channelId : undefined,
+      channelId: this.session?.guildId === guildId ? this.session.channelId : undefined,
       ownsConversation: this.session?.guildId === guildId,
     };
     try {
       const controller = this.client();
-      const [engine, settings] = await Promise.all([
-        controller.status(),
-        controller.settings(),
-      ]);
+      const [engine, settings] = await Promise.all([controller.status(), controller.settings()]);
       return { ...base, controller: "ready", engine, settings };
     } catch (error) {
       return {
         ...base,
         controller: "unavailable",
         error:
-          error instanceof VoiceError
-            ? error.message
-            : "nox-voice-mlx controller unavailable.",
+          error instanceof VoiceError ? error.message : "nox-voice-mlx controller unavailable.",
       };
     }
   }
@@ -122,11 +107,7 @@ export class VoiceService extends EventEmitter {
   private async enter(guildId: string, settings: Settings): Promise<void> {
     if (this.closing) throw new VoiceError("The bot is shutting down.", 503);
     if (this.session) {
-      if (
-        this.isActive(guildId) &&
-        this.session.channelId === settings.channelId
-      )
-        return;
+      if (this.isActive(guildId) && this.session.channelId === settings.channelId) return;
       throw new VoiceError(
         "NoX Voice already has a conversation. Disable it before joining another channel.",
       );
@@ -153,8 +134,7 @@ export class VoiceService extends EventEmitter {
         throw new VoiceError("Discord voice disconnected.", 503);
       }
       await this.open(session, controller);
-      if (this.session !== session)
-        throw new VoiceError("Voice session disconnected.", 503);
+      if (this.session !== session) throw new VoiceError("Voice session disconnected.", 503);
       this.state = "active";
       this.emit("change");
     } catch (error) {
@@ -173,10 +153,7 @@ export class VoiceService extends EventEmitter {
         "The voice service is in use by another conversation. End it before enabling NoX Voice.",
       );
   }
-  private async open(
-    session: NonNullable<VoiceService["session"]>,
-    controller: Controller,
-  ) {
+  private async open(session: NonNullable<VoiceService["session"]>, controller: Controller) {
     const socket = await controller.connect();
     if (this.session !== session) {
       socket.terminate();
@@ -225,8 +202,7 @@ export class VoiceService extends EventEmitter {
         this.session?.conversation?.close();
         this.session = undefined;
         this.state = "error";
-        this.error =
-          "Could not move voice channel. Explicitly enable the plugin again.";
+        this.error = "Could not move voice channel. Explicitly enable the plugin again.";
         this.emit("change");
       }
     });
@@ -235,9 +211,7 @@ export class VoiceService extends EventEmitter {
     const deadline = performance.now() + 5000;
     while ((await controller.status()).conversationActive) {
       if (performance.now() >= deadline)
-        throw new VoiceError(
-          "The previous conversation has not closed yet. Try again shortly.",
-        );
+        throw new VoiceError("The previous conversation has not closed yet. Try again shortly.");
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
@@ -261,9 +235,7 @@ export class VoiceService extends EventEmitter {
         const result = await controller.update(settings);
         if (session) {
           if (this.session !== session)
-            throw new VoiceError(
-              "Discord disconnected while applying settings.",
-            );
+            throw new VoiceError("Discord disconnected while applying settings.");
           await this.open(session, controller);
           this.state = "active";
           this.emit("change");
@@ -275,10 +247,7 @@ export class VoiceService extends EventEmitter {
       }
     });
   }
-  action(
-    guildId: string,
-    action: "start" | "stop" | "restart",
-  ): Promise<EngineStatus> {
+  action(guildId: string, action: "start" | "stop" | "restart"): Promise<EngineStatus> {
     return this.run(async () => {
       const controller = this.client();
       if (this.session && this.session.guildId !== guildId)

@@ -20,9 +20,7 @@ export default class Bot {
     ],
   ) {
     this.client = new Client({ intents });
-    this.on("clientReady", () =>
-      Logger.success(`NoX Bot online as ${this.client.user?.tag}`),
-    );
+    this.on("clientReady", () => Logger.success(`NoX Bot online as ${this.client.user?.tag}`));
     this.on("error", () => Logger.error("Discord client error."));
     this.on("warn", () => Logger.warn("Discord client warning."));
     this.on("interactionCreate", (interaction) => {
@@ -69,19 +67,12 @@ export default class Bot {
       })();
     });
   }
-  attach(
-    router: InteractionRouter,
-    quick: QuickCommandService,
-    messaging: MessagingService,
-  ): void {
+  attach(router: InteractionRouter, quick: QuickCommandService, messaging: MessagingService): void {
     this.router = router;
     this.quick = quick;
     this.messaging = messaging;
   }
-  on<K extends keyof ClientEvents>(
-    event: K,
-    handler: (...args: ClientEvents[K]) => void,
-  ): void {
+  on<K extends keyof ClientEvents>(event: K, handler: (...args: ClientEvents[K]) => void): void {
     this.client.on(event, handler);
     this.handlers.push(() => this.client.off(event, handler));
   }

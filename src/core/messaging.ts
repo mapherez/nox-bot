@@ -15,18 +15,13 @@ export interface MessageReceipt {
 }
 export interface MessagingAdapter {
   provider: "discord";
-  send(
-    target: MessageTarget,
-    content: RichContent,
-    signal?: AbortSignal,
-  ): Promise<MessageReceipt>;
+  send(target: MessageTarget, content: RichContent, signal?: AbortSignal): Promise<MessageReceipt>;
 }
 export class MessagingService {
   private adapters = new Map<string, MessagingAdapter>();
   constructor(adapters: readonly MessagingAdapter[]) {
     for (const adapter of adapters) {
-      if (this.adapters.has(adapter.provider))
-        throw new Error("Duplicate messaging provider.");
+      if (this.adapters.has(adapter.provider)) throw new Error("Duplicate messaging provider.");
       this.adapters.set(adapter.provider, adapter);
     }
   }
@@ -38,11 +33,7 @@ export class MessagingService {
     signal?.throwIfAborted();
     const adapter = this.adapters.get(target.provider);
     if (!adapter) throw new Error("Messaging provider is not available.");
-    if (
-      !content.content?.trim() &&
-      !content.embeds?.length &&
-      !content.attachments?.length
-    )
+    if (!content.content?.trim() && !content.embeds?.length && !content.attachments?.length)
       throw new Error("Message content is required.");
     return adapter.send(target, content, signal);
   }

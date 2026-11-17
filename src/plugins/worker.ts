@@ -10,16 +10,12 @@ function isRuntime(value: unknown): value is PluginRuntime {
   return (
     isRecord(value) &&
     isRecord(value.handlers) &&
-    Object.values(value.handlers).every(
-      (handler) => typeof handler === "function",
-    ) &&
+    Object.values(value.handlers).every((handler) => typeof handler === "function") &&
     ["components", "autocomplete"].every(
       (key) =>
         value[key] === undefined ||
         (isRecord(value[key]) &&
-          Object.values(value[key]).every(
-            (handler) => typeof handler === "function",
-          )),
+          Object.values(value[key]).every((handler) => typeof handler === "function")),
     ) &&
     ["activate", "configure", "dispose"].every(
       (key) => value[key] === undefined || typeof value[key] === "function",
@@ -27,39 +23,24 @@ function isRuntime(value: unknown): value is PluginRuntime {
   );
 }
 process.on("message", (input: unknown) => {
-  if (
-    !isRecord(input) ||
-    typeof input.requestId !== "string" ||
-    typeof input.type !== "string"
-  )
+  if (!isRecord(input) || typeof input.requestId !== "string" || typeof input.type !== "string")
     return;
   // IPC originates only from the typed supervisor. Runtime definitions are checked before activation.
   const message = input as unknown as ParentMessage;
   void (async () => {
     switch (message.type) {
       case "initialize": {
-        const loaded: { default?: unknown } = await import(
-          pathToFileURL(message.entry).href
-        );
+        const loaded: { default?: unknown } = await import(pathToFileURL(message.entry).href);
         const candidate = loaded.default;
-        if (!isRuntime(candidate))
-          throw new Error("Invalid plugin runtime contract.");
-        if (
-          message.handlers.some(
-            (handler) => typeof candidate.handlers[handler] !== "function",
-          )
-        )
-          throw new Error(
-            "Runtime command handlers do not match its definition.",
-          );
+        if (!isRuntime(candidate)) throw new Error("Invalid plugin runtime contract.");
+        if (message.handlers.some((handler) => typeof candidate.handlers[handler] !== "function"))
+          throw new Error("Runtime command handlers do not match its definition.");
         if (
           message.componentHandlers.some(
             (handler) => typeof candidate.components?.[handler] !== "function",
           )
         )
-          throw new Error(
-            "Runtime component handlers do not match its definition.",
-          );
+          throw new Error("Runtime component handlers do not match its definition.");
         runtime = candidate;
         await runtime.activate?.();
         message.guilds.forEach((id) => guilds.add(id));

@@ -31,9 +31,7 @@ async function weather(context: PluginContext): Promise<RichContent> {
       content:
         "Weather is not configured for this server. Ask the owner to configure it in the dashboard.",
     };
-  const location = String(
-    context.options.location || context.settings.defaultLocation,
-  );
+  const location = String(context.options.location || context.settings.defaultLocation);
   try {
     const geoUrl = new URL("https://api.openweathermap.org/geo/1.0/direct");
     geoUrl.search = new URLSearchParams({
@@ -106,10 +104,7 @@ async function weather(context: PluginContext): Promise<RichContent> {
       ],
     };
   } catch (error) {
-    const status =
-      error && typeof error === "object" && "status" in error
-        ? error.status
-        : null;
+    const status = error && typeof error === "object" && "status" in error ? error.status : null;
     return {
       content:
         status === 401

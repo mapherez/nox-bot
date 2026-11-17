@@ -22,8 +22,7 @@ export default class Application {
   constructor(
     private readonly env: NodeJS.ProcessEnv = process.env,
     dependencies: Partial<ApplicationDependencies> = {},
-    private readonly exit: (code: number) => void = (code) =>
-      process.exit(code),
+    private readonly exit: (code: number) => void = (code) => process.exit(code),
     private readonly shutdownTimeoutMs = 10000,
   ) {
     this.dependencies = { createRuntime: Runtime.create, ...dependencies };
@@ -32,15 +31,12 @@ export default class Application {
     return this.state;
   }
   start(): Promise<void> {
-    if (this.state === "stopping")
-      return Promise.reject(new Error("Application is stopping."));
+    if (this.state === "stopping") return Promise.reject(new Error("Application is stopping."));
     return (this.startup ??= this.initialize());
   }
   private terminate(code: number): Promise<void> {
     this.exitCode = Math.max(this.exitCode, code);
-    return (this.terminating ??= this.stop().then(() =>
-      this.exit(this.exitCode),
-    ));
+    return (this.terminating ??= this.stop().then(() => this.exit(this.exitCode)));
   }
   private async initialize(): Promise<void> {
     try {
@@ -49,20 +45,15 @@ export default class Application {
         Logger.info(message);
         void this.terminate(code);
       };
-      this.listeners.set("SIGINT", () =>
-        terminate(0, "Received SIGINT; shutting down."),
-      );
-      this.listeners.set("SIGTERM", () =>
-        terminate(0, "Received SIGTERM; shutting down."),
-      );
+      this.listeners.set("SIGINT", () => terminate(0, "Received SIGINT; shutting down."));
+      this.listeners.set("SIGTERM", () => terminate(0, "Received SIGTERM; shutting down."));
       this.listeners.set("uncaughtException", () =>
         terminate(1, "Uncaught exception; shutting down."),
       );
       this.listeners.set("unhandledRejection", () =>
         terminate(1, "Unhandled rejection; shutting down."),
       );
-      for (const [event, listener] of this.listeners)
-        process.on(event, listener);
+      for (const [event, listener] of this.listeners) process.on(event, listener);
       this.runtime = await this.dependencies.createRuntime(
         this.env,
         () => this.state,
@@ -107,8 +98,7 @@ export default class Application {
       Logger.error("Runtime cleanup failed.");
     } finally {
       clearTimeout(timer);
-      for (const [event, listener] of this.listeners)
-        process.off(event, listener);
+      for (const [event, listener] of this.listeners) process.off(event, listener);
       this.listeners.clear();
     }
   }

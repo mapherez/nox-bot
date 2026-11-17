@@ -13,7 +13,7 @@ import { AuthService } from "../dist/core/auth.js";
 import { sqliteFixture, untilSqlite } from "./fixtures/sqlite.mjs";
 import { quietLogger } from "./helpers.mjs";
 quietLogger();
-test(
+void test(
   "real SQLite worker recovery preserves text workers, sessions, Quick Commands and reconciliation without a DB server",
   { timeout: 30000 },
   async (t) => {
@@ -23,9 +23,7 @@ test(
     const launcher = (entry, args, options) =>
       fork(entry, args, {
         ...options,
-        execArgv: [
-          `--import=${new URL("./fixtures/worker-fetch.mjs", import.meta.url).href}`,
-        ],
+        execArgv: [`--import=${new URL("./fixtures/worker-fetch.mjs", import.meta.url).href}`],
       });
     const plugins = new PluginManager(
       state,
@@ -41,9 +39,7 @@ test(
       secrets: { apiKey: "fixture-key" },
       expectedRevision: "0",
     });
-    const workers = builtInPlugins.filter(
-      (plugin) => !plugin.capabilities.includes("voice"),
-    );
+    const workers = builtInPlugins.filter((plugin) => !plugin.capabilities.includes("voice"));
     for (const plugin of workers)
       await plugins.setEnabled(
         plugin.id,
@@ -52,10 +48,7 @@ test(
         plugins.configuration(plugin.id, guildId).revision,
       );
     const pids = Object.fromEntries(
-      workers.map((plugin) => [
-        plugin.id,
-        plugins.runtimeStatus(plugin.id).pid,
-      ]),
+      workers.map((plugin) => [plugin.id, plugins.runtimeStatus(plugin.id).pid]),
     );
     const quick = new QuickCommandService(state);
     await quick.save(
@@ -101,10 +94,9 @@ test(
     assert.equal(auth.authenticate(token).userId, "7");
     assert.equal(plugins.configuration("voice", guildId).enabled, false);
     assert.throws(() => auth.beginLogin(), { code: "STATE_UNAVAILABLE" });
-    await assert.rejects(
-      quick.delete(guildId, "hello", quick.list(guildId)[0].revision),
-      { code: "STATE_UNAVAILABLE" },
-    );
+    await assert.rejects(quick.delete(guildId, "hello", quick.list(guildId)[0].revision), {
+      code: "STATE_UNAVAILABLE",
+    });
     const context = {
       guildId,
       user: {
@@ -122,15 +114,11 @@ test(
     };
     const results = {};
     for (const plugin of workers)
-      results[plugin.id] = await plugins.execute(
-        plugin.id,
-        plugin.commands[0].handler,
-        {
-          ...context,
-          command: plugin.commands[0].name,
-          options: plugin.id === "dictionary" ? { word: "coracao" } : {},
-        },
-      );
+      results[plugin.id] = await plugins.execute(plugin.id, plugin.commands[0].handler, {
+        ...context,
+        command: plugin.commands[0].name,
+        options: plugin.id === "dictionary" ? { word: "coracao" } : {},
+      });
     assert.match(results.weather.embeds[0].title, /London/);
     assert.equal(results.dictionary.attachments.length, 1);
     assert.match(results.ping.content, /Pong/);
@@ -162,8 +150,7 @@ test(
     let writes = 0;
     const reconciler = new CommandReconciler("9", registry, {
       get: async () => actual,
-      post: async (_route, { body }) =>
-        actual.push({ ...body, id: String(++writes) }),
+      post: async (_route, { body }) => actual.push({ ...body, id: String(++writes) }),
       patch: async () => {
         writes++;
       },
@@ -183,10 +170,7 @@ test(
     // A fresh process can open the same durable file without waiting for another DB container.
     const cold = f.create();
     await cold.state.start();
-    assert.equal(
-      cold.state.get("quick", guildId, "hello").data.response,
-      "Public response",
-    );
+    assert.equal(cold.state.get("quick", guildId, "hello").data.response, "Public response");
     await cold.state.close();
     hold = false;
     release();

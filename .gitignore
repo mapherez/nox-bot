@@ -121,3 +121,9 @@ data/
 *.db-*
 compose.override.yaml
 compose.override.yml
+
+# Shared Vite+ editor configuration.
+!.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

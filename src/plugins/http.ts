@@ -1,7 +1,4 @@
-export async function readBounded(
-  response: Response,
-  maximum: number,
-): Promise<Uint8Array> {
+export async function readBounded(response: Response, maximum: number): Promise<Uint8Array> {
   if (Number(response.headers.get("content-length")) > maximum)
     throw new Error("Upstream response is too large.");
   if (!response.body) return new Uint8Array();

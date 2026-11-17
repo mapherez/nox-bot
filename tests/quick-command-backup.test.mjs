@@ -7,17 +7,12 @@ import { memoryState } from "./fixtures/state.mjs";
 import { quietLogger } from "./helpers.mjs";
 quietLogger();
 const revisions = (quick, guildId, commands) => {
-  const existing = new Map(
-    quick.list(guildId).map((row) => [row.data.trigger, row.revision]),
-  );
+  const existing = new Map(quick.list(guildId).map((row) => [row.data.trigger, row.revision]));
   return Object.fromEntries(
-    commands.map((command) => [
-      command.trigger,
-      existing.get(command.trigger) ?? "0",
-    ]),
+    commands.map((command) => [command.trigger, existing.get(command.trigger) ?? "0"]),
   );
 };
-test("backup roundtrip includes disabled commands and preserves exact responses across a different server/database", async (t) => {
+void test("backup roundtrip includes disabled commands and preserves exact responses across a different server/database", async (t) => {
   const f = await memoryState(t),
     quick = new QuickCommandService(f.state);
   await quick.save(
@@ -54,10 +49,7 @@ test("backup roundtrip includes disabled commands and preserves exact responses 
     { guildId: "2", trigger: "keep", response: "Keep this", enabled: true },
     "0",
   );
-  assert.equal(
-    await quick.import("2", backup, revisions(quick, "2", backup)),
-    2,
-  );
+  assert.equal(await quick.import("2", backup, revisions(quick, "2", backup)), 2);
   assert.equal(quick.response("2", "hello"), backup[0].response);
   assert.equal(quick.response("2", "hidden"), undefined);
   assert.equal(quick.response("2", "keep"), "Keep this");
@@ -67,12 +59,11 @@ test("backup roundtrip includes disabled commands and preserves exact responses 
   assert.deepEqual(restored.export("2"), backup);
   f.disconnect();
   assert.deepEqual(quick.export("1"), backup);
-  await assert.rejects(
-    quick.import("1", backup, revisions(quick, "1", backup)),
-    { code: "STATE_UNAVAILABLE" },
-  );
+  await assert.rejects(quick.import("1", backup, revisions(quick, "1", backup)), {
+    code: "STATE_UNAVAILABLE",
+  });
 });
-test("all entries and duplicate triggers are validated before writing any command", async (t) => {
+void test("all entries and duplicate triggers are validated before writing any command", async (t) => {
   const f = await memoryState(t),
     quick = new QuickCommandService(f.state);
   const valid = { trigger: "hello", response: "Hello", enabled: true };
@@ -98,20 +89,13 @@ test("all entries and duplicate triggers are validated before writing any comman
     assert.deepEqual(quick.export("1"), []);
   }
   assert.throws(
-    () =>
-      parseQuickCommandBackup([valid, { ...valid, trigger: " HELLO " }], "1"),
+    () => parseQuickCommandBackup([valid, { ...valid, trigger: " HELLO " }], "1"),
     /duplicates/,
   );
-  assert.throws(
-    () => parseQuickCommandBackup({ commands: [valid] }, "1"),
-    /JSON array/,
-  );
-  assert.deepEqual(
-    parseQuickCommandBackup([{ ...valid, trigger: " HELLO " }], "1"),
-    [valid],
-  );
+  assert.throws(() => parseQuickCommandBackup({ commands: [valid] }, "1"), /JSON array/);
+  assert.deepEqual(parseQuickCommandBackup([{ ...valid, trigger: " HELLO " }], "1"), [valid]);
 });
-test("import rejects stale or missing revisions without overwriting confirmed commands", async (t) => {
+void test("import rejects stale or missing revisions without overwriting confirmed commands", async (t) => {
   const f = await memoryState(t),
     quick = new QuickCommandService(f.state);
   const entry = { trigger: "hello", response: "Original", enabled: true };
@@ -127,7 +111,7 @@ test("import rejects stale or missing revisions without overwriting confirmed co
   });
   assert.equal(quick.response("1", "hello"), "Original");
 });
-test("large complete backups use one transaction and a failed commit never imports a partial list", async (t) => {
+void test("large complete backups use one transaction and a failed commit never imports a partial list", async (t) => {
   const commands = Array.from({ length: 1001 }, (_, index) => ({
     trigger: `q${index}`,
     response: `Answer ${index}`,
@@ -141,10 +125,7 @@ test("large complete backups use one transaction and a failed commit never impor
     batches.push(changes.length);
     await mutate(changes);
   };
-  assert.equal(
-    await quick.import("1", commands, revisions(quick, "1", commands)),
-    1001,
-  );
+  assert.equal(await quick.import("1", commands, revisions(quick, "1", commands)), 1001);
   assert.deepEqual(batches, [1001]);
   assert.equal(quick.export("1").length, 1001);
   const interrupted = await memoryState(t),
@@ -152,9 +133,8 @@ test("large complete backups use one transaction and a failed commit never impor
   interrupted.transport.mutate = async () => {
     throw new StateError("STATE_UNAVAILABLE", "Disconnected");
   };
-  await assert.rejects(
-    partial.import("1", commands, revisions(partial, "1", commands)),
-    { code: "STATE_UNAVAILABLE" },
-  );
+  await assert.rejects(partial.import("1", commands, revisions(partial, "1", commands)), {
+    code: "STATE_UNAVAILABLE",
+  });
   assert.deepEqual(partial.export("1"), []);
 });

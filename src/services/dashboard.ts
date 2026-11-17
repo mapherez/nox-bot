@@ -1,8 +1,4 @@
-import {
-  createServer,
-  type IncomingMessage,
-  type ServerResponse,
-} from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { resolve, extname, sep } from "node:path";
@@ -38,9 +34,7 @@ const cookies = (request: IncomingMessage): Record<string, string> =>
   Object.fromEntries(
     (request.headers.cookie ?? "").split(";").flatMap((part) => {
       const index = part.indexOf("=");
-      return index < 0
-        ? []
-        : [[part.slice(0, index).trim(), part.slice(index + 1).trim()]];
+      return index < 0 ? [] : [[part.slice(0, index).trim(), part.slice(index + 1).trim()]];
     }),
   );
 function json(response: ServerResponse, status: number, body: unknown): void {
@@ -50,22 +44,14 @@ function json(response: ServerResponse, status: number, body: unknown): void {
   });
   response.end(JSON.stringify(body));
 }
-async function body(
-  request: IncomingMessage,
-  maxBytes = 65536,
-): Promise<Record<string, unknown>> {
+async function body(request: IncomingMessage, maxBytes = 65536): Promise<Record<string, unknown>> {
   if (!request.headers["content-type"]?.startsWith("application/json"))
     throw new AuthError(415, "INVALID_PAYLOAD", "Use application/json.");
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > maxBytes)
-      throw new AuthError(
-        413,
-        "PAYLOAD_TOO_LARGE",
-        "The request is too large.",
-      );
+    if (size > maxBytes) throw new AuthError(413, "PAYLOAD_TOO_LARGE", "The request is too large.");
     chunks.push(chunk);
   }
   try {
@@ -85,25 +71,15 @@ function shape(
     Object.keys(value).some((key) => !fields.includes(key)) ||
     required.some((key) => !(key in value))
   )
-    throw new AuthError(
-      400,
-      "INVALID_PAYLOAD",
-      "Unexpected or missing fields.",
-    );
+    throw new AuthError(400, "INVALID_PAYLOAD", "Unexpected or missing fields.");
 }
 function revision(value: unknown): string {
   if (typeof value !== "string" || !/^\d+$/.test(value))
-    throw new AuthError(
-      400,
-      "INVALID_PAYLOAD",
-      "A valid expectedRevision is required.",
-    );
+    throw new AuthError(400, "INVALID_PAYLOAD", "A valid expectedRevision is required.");
   return value;
 }
 export class DashboardServer {
-  private server = createServer(
-    (request, response) => void this.handle(request, response),
-  );
+  private server = createServer((request, response) => void this.handle(request, response));
   private streams = new Set<ServerResponse>();
   private readonly assets: string;
   private readonly guilds: GuildConfigurationService;
@@ -144,9 +120,7 @@ export class DashboardServer {
       info,
       processState,
     });
-    this.assets =
-      options.assets ??
-      fileURLToPath(new URL("../../web/dist", import.meta.url));
+    this.assets = options.assets ?? fileURLToPath(new URL("../../web/dist", import.meta.url));
     this.server.requestTimeout = 15000;
     this.server.headersTimeout = 10000;
   }
@@ -165,10 +139,7 @@ export class DashboardServer {
   snapshot(guildId: string): GuildSnapshot {
     return this.guilds.snapshot(guildId);
   }
-  private async handle(
-    request: IncomingMessage,
-    response: ServerResponse,
-  ): Promise<void> {
+  private async handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Referrer-Policy", "same-origin");
     response.setHeader(
@@ -182,15 +153,12 @@ export class DashboardServer {
         token = jar[this.auth.sessionCookieName];
       if (url.pathname === "/mcp" || url.pathname.startsWith("/mcp/")) {
         const match = /^\/mcp\/guilds\/([^/]+)$/.exec(url.pathname);
-        if (!match)
-          throw new ControlError("ROUTE_NOT_FOUND", "Route not found.");
+        if (!match) throw new ControlError("ROUTE_NOT_FOUND", "Route not found.");
         await this.mcp.handle(decodeURIComponent(match[1]), request, response);
         return;
       }
       if (url.pathname === "/health" && method === "GET") {
-        const ready =
-          this.state.initialized &&
-          this.operations.getStatus().discord?.ready === true;
+        const ready = this.state.initialized && this.operations.getStatus().discord?.ready === true;
         json(response, ready ? 200 : 503, {
           ready,
           synchronization: this.state.synchronization,
@@ -233,14 +201,8 @@ export class DashboardServer {
         }
         return;
       }
-      if (
-        url.pathname.startsWith("/auth/") ||
-        url.pathname.startsWith("/dashboard/api")
-      ) {
-        let session = this.auth.authenticate(
-          token,
-          url.pathname !== "/auth/logout",
-        );
+      if (url.pathname.startsWith("/auth/") || url.pathname.startsWith("/dashboard/api")) {
+        let session = this.auth.authenticate(token, url.pathname !== "/auth/logout");
         if (!["GET", "HEAD"].includes(method))
           this.auth.validateMutation(
             session,
@@ -250,10 +212,7 @@ export class DashboardServer {
               : undefined,
           );
         if (url.pathname === "/auth/logout" && method === "POST") {
-          response.setHeader(
-            "Set-Cookie",
-            await this.auth.logout(token!, session),
-          );
+          response.setHeader("Set-Cookie", await this.auth.logout(token!, session));
           json(response, 200, { ok: true });
           return;
         }
@@ -276,9 +235,7 @@ export class DashboardServer {
           json(response, 200, await this.operations.listGuilds());
           return;
         }
-        const match = /^\/dashboard\/api\/guilds\/([^/]+)(?:\/(.*))?$/.exec(
-          url.pathname,
-        );
+        const match = /^\/dashboard\/api\/guilds\/([^/]+)(?:\/(.*))?$/.exec(url.pathname);
         if (match) {
           const guildId = decodeURIComponent(match[1]),
             resource = match[2] ?? "";
@@ -305,13 +262,9 @@ export class DashboardServer {
               resource,
             );
           if (voiceRoute) {
-            if (!this.voice)
-              throw new VoiceError("NoX Voice is not configured.", 503);
+            if (!this.voice) throw new VoiceError("NoX Voice is not configured.", 503);
             const route = voiceRoute[1];
-            if (
-              method === "GET" &&
-              ["channels", "status", "diagnostics"].includes(route)
-            ) {
+            if (method === "GET" && ["channels", "status", "diagnostics"].includes(route)) {
               const result =
                 route === "channels"
                   ? await this.voice.channels(guildId)
@@ -324,11 +277,7 @@ export class DashboardServer {
             if (method === "PUT" && route === "settings") {
               const input = await body(request);
               shape(input, ["voice", "prompt", "bits"]);
-              json(
-                response,
-                200,
-                await this.voice.applySettings(guildId, input),
-              );
+              json(response, 200, await this.voice.applySettings(guildId, input));
               return;
             }
             if (method === "POST" && route.startsWith("engine/")) {
@@ -336,33 +285,19 @@ export class DashboardServer {
               json(
                 response,
                 202,
-                await this.voice.action(
-                  guildId,
-                  route.slice(7) as "start" | "stop" | "restart",
-                ),
+                await this.voice.action(guildId, route.slice(7) as "start" | "stop" | "restart"),
               );
               return;
             }
-            throw new AuthError(
-              405,
-              "METHOD_NOT_ALLOWED",
-              "Method not allowed.",
-            );
+            throw new AuthError(405, "METHOD_NOT_ALLOWED", "Method not allowed.");
           }
-          const plugin =
-            /^plugins\/([a-z][a-z0-9-]{0,31})\/(enabled|settings)$/.exec(
-              resource,
-            );
+          const plugin = /^plugins\/([a-z][a-z0-9-]{0,31})\/(enabled|settings)$/.exec(resource);
           if (plugin && method === "PUT") {
             const input = await body(request);
             if (plugin[2] === "enabled") {
               shape(input, ["enabled", "expectedRevision"]);
               if (typeof input.enabled !== "boolean")
-                throw new AuthError(
-                  400,
-                  "INVALID_PAYLOAD",
-                  "enabled must be a boolean.",
-                );
+                throw new AuthError(400, "INVALID_PAYLOAD", "enabled must be a boolean.");
               await this.plugins.setEnabled(
                 plugin[1],
                 guildId,
@@ -385,9 +320,7 @@ export class DashboardServer {
                 throw new AuthError(400, "INVALID_PAYLOAD", "Invalid secrets.");
               await this.plugins.configure(plugin[1], guildId, {
                 settings: input.settings,
-                secrets: input.secrets as
-                  | Record<string, string | null>
-                  | undefined,
+                secrets: input.secrets as Record<string, string | null> | undefined,
                 expectedRevision: revision(input.expectedRevision),
               });
             }
@@ -405,37 +338,21 @@ export class DashboardServer {
           if (resource === "quick-commands/import" && method === "POST") {
             const input = await body(request, QUICK_COMMAND_BACKUP_MAX_BYTES);
             shape(input, ["commands", "expectedRevisions"]);
-            await this.quick.import(
-              guildId,
-              input.commands,
-              input.expectedRevisions,
-            );
+            await this.quick.import(guildId, input.commands, input.expectedRevisions);
             json(response, 200, this.snapshot(guildId));
             return;
           }
-          const quick = /^quick-commands(?:\/([a-zA-Z0-9_-]{1,32}))?$/.exec(
-            resource,
-          );
+          const quick = /^quick-commands(?:\/([a-zA-Z0-9_-]{1,32}))?$/.exec(resource);
           if (quick && (method === "POST" || method === "PUT")) {
             const input = await body(request);
-            shape(input, [
-              "trigger",
-              "response",
-              "enabled",
-              "expectedRevision",
-            ]);
+            shape(input, ["trigger", "response", "enabled", "expectedRevision"]);
             if (
               typeof input.trigger !== "string" ||
               typeof input.response !== "string" ||
               typeof input.enabled !== "boolean" ||
-              (method === "PUT" &&
-                quick[1]?.toLowerCase() !== input.trigger.toLowerCase())
+              (method === "PUT" && quick[1]?.toLowerCase() !== input.trigger.toLowerCase())
             )
-              throw new AuthError(
-                400,
-                "INVALID_PAYLOAD",
-                "Invalid Quick Command.",
-              );
+              throw new AuthError(400, "INVALID_PAYLOAD", "Invalid Quick Command.");
             await this.quick.save(
               guildId,
               {
@@ -452,11 +369,7 @@ export class DashboardServer {
           if (quick?.[1] && method === "DELETE") {
             const input = await body(request);
             shape(input, ["expectedRevision"]);
-            await this.quick.delete(
-              guildId,
-              quick[1],
-              revision(input.expectedRevision),
-            );
+            await this.quick.delete(guildId, quick[1], revision(input.expectedRevision));
             json(response, 200, this.snapshot(guildId));
             return;
           }
@@ -473,8 +386,7 @@ export class DashboardServer {
       try {
         data = await readFile(filename);
       } catch {
-        if (extname(relative))
-          throw new AuthError(404, "ROUTE_NOT_FOUND", "Asset not found.");
+        if (extname(relative)) throw new AuthError(404, "ROUTE_NOT_FOUND", "Asset not found.");
         data = await readFile(resolve(this.assets, "index.html"));
       }
       const mime: Record<string, string> = {
@@ -510,11 +422,7 @@ export class DashboardServer {
       else if (error instanceof StateError)
         json(
           response,
-          error.code === "STATE_CONFLICT"
-            ? 409
-            : error.code === "INVALID_STATE"
-              ? 400
-              : 503,
+          error.code === "STATE_CONFLICT" ? 409 : error.code === "INVALID_STATE" ? 400 : 503,
           { code: error.code, message: error.message },
         );
       else if (error instanceof ControlError)
@@ -526,17 +434,12 @@ export class DashboardServer {
         Logger.warn("Dashboard operation failed.");
         json(response, 400, {
           code: "INVALID_REQUEST",
-          message:
-            "The request could not be completed. Check the configuration and try again.",
+          message: "The request could not be completed. Check the configuration and try again.",
         });
       }
     }
   }
-  private stream(
-    response: ServerResponse,
-    guildId: string,
-    token: string,
-  ): void {
+  private stream(response: ServerResponse, guildId: string, token: string): void {
     response.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-store",

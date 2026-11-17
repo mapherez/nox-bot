@@ -16,10 +16,7 @@ export async function memoryState(t, launch) {
     mutate: async (changes) => {
       for (const change of changes)
         if ((rows.get(change.key)?.revision ?? 0n) !== change.expectedRevision)
-          throw new StateError(
-            "STATE_CONFLICT",
-            "Configuration changed elsewhere.",
-          );
+          throw new StateError("STATE_CONFLICT", "Configuration changed elsewhere.");
       sequence++;
       for (const change of changes)
         change.value === null

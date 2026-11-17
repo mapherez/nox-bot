@@ -60,7 +60,7 @@ async function fixture(t, now = Date.now, voice) {
     });
   return { ...f, auth, server, call, origin, headers };
 }
-test("dashboard renews the cookie and persisted session for one year and logout clears both", async (t) => {
+void test("dashboard renews the cookie and persisted session for one year and logout clears both", async (t) => {
   const year = 365 * 24 * 60 * 60 * 1000;
   let clock = 1000000;
   const f = await fixture(t, () => clock);
@@ -89,7 +89,7 @@ test("dashboard renews the cookie and persisted session for one year and logout 
   assert.equal(loggedOut.status, 401);
   assert.equal(loggedOut.headers.get("set-cookie"), null);
 });
-test("dashboard upgrades an unexpired legacy session to one year without another login", async (t) => {
+void test("dashboard upgrades an unexpired legacy session to one year without another login", async (t) => {
   const day = 24 * 60 * 60 * 1000;
   let clock = 1000000;
   const f = await fixture(t, () => clock);
@@ -106,7 +106,7 @@ test("dashboard upgrades an unexpired legacy session to one year without another
   clock += 2 * day;
   assert.equal((await f.call("/dashboard/api/session")).status, 200);
 });
-test("dashboard requires owner session and verified CSRF/Origin before guild/config access", async (t) => {
+void test("dashboard requires owner session and verified CSRF/Origin before guild/config access", async (t) => {
   const f = await fixture(t);
   assert.equal((await fetch(`${f.origin}/dashboard/api/guilds`)).status, 401);
   assert.equal((await f.call("/dashboard/api/guilds/2")).status, 404);
@@ -133,19 +133,12 @@ test("dashboard requires owner session and verified CSRF/Origin before guild/con
     403,
   );
   assert.equal(
-    (
-      await f.call(
-        "/auth/logout",
-        "POST",
-        {},
-        { Origin: "https://attacker.example" },
-      )
-    ).status,
+    (await f.call("/auth/logout", "POST", {}, { Origin: "https://attacker.example" })).status,
     403,
   );
   assert.equal(f.plugins.configuration("ping", "1").enabled, false);
 });
-test("CRUD has revision conflicts and sanitizes secrets in reads and SSE; existing sessions work offline", async (t) => {
+void test("CRUD has revision conflicts and sanitizes secrets in reads and SSE; existing sessions work offline", async (t) => {
   const f = await fixture(t),
     endpoint = "/dashboard/api/guilds/1";
   let response = await f.call(`${endpoint}/plugins/weather/settings`, "PUT", {
@@ -217,19 +210,16 @@ test("CRUD has revision conflicts and sanitizes secrets in reads and SSE; existi
   assert.equal((await f.call("/auth/logout", "POST", {})).status, 200);
   assert.equal((await f.call("/dashboard/api/session")).status, 401);
 });
-test("dashboard static assets use same origin, security headers and block traversal", async (t) => {
+void test("dashboard static assets use same origin, security headers and block traversal", async (t) => {
   const f = await fixture(t);
   const response = await fetch(f.origin);
   assert.equal(response.status, 200);
-  assert.match(
-    response.headers.get("content-security-policy"),
-    /frame-ancestors 'none'/,
-  );
+  assert.match(response.headers.get("content-security-policy"), /frame-ancestors 'none'/);
   assert.match(await response.text(), /NoX Bot/);
   assert.equal((await fetch(`${f.origin}/%2e%2e%2fpackage.json`)).status, 404);
 });
 
-test("voice routes preserve owner auth, CSRF, guild boundaries and the separate text-channel contract", async (t) => {
+void test("voice routes preserve owner auth, CSRF, guild boundaries and the separate text-channel contract", async (t) => {
   const calls = [];
   const voice = {
     async channels(guildId) {
@@ -256,19 +246,10 @@ test("voice routes preserve owner auth, CSRF, guild boundaries and the separate 
   const f = await fixture(t, Date.now, voice),
     base = "/dashboard/api/guilds/1/voice";
   assert.equal((await fetch(`${f.origin}${base}/status`)).status, 401);
+  assert.equal((await f.call("/dashboard/api/guilds/2/voice/status")).status, 404);
   assert.equal(
-    (await f.call("/dashboard/api/guilds/2/voice/status")).status,
-    404,
-  );
-  assert.equal(
-    (
-      await f.call(
-        `${base}/engine/start`,
-        "POST",
-        {},
-        { Origin: "https://attacker.example" },
-      )
-    ).status,
+    (await f.call(`${base}/engine/start`, "POST", {}, { Origin: "https://attacker.example" }))
+      .status,
     403,
   );
   assert.deepEqual(calls, []);
@@ -298,7 +279,7 @@ test("voice routes preserve owner auth, CSRF, guild boundaries and the separate 
   assert.equal((await f.call(`${base}/engine/stop`, "POST", {})).status, 503);
 });
 
-test("Quick Command backup routes export the complete portable list and import with owner/CSRF/guild checks", async (t) => {
+void test("Quick Command backup routes export the complete portable list and import with owner/CSRF/guild checks", async (t) => {
   const f = await fixture(t),
     base = "/dashboard/api/guilds/1/quick-commands";
   const entry = {
@@ -306,16 +287,10 @@ test("Quick Command backup routes export the complete portable list and import w
     response: "Backup response\nwith formatting",
     enabled: false,
   };
-  assert.equal(
-    (await f.call(base, "POST", { ...entry, expectedRevision: "0" })).status,
-    200,
-  );
+  assert.equal((await f.call(base, "POST", { ...entry, expectedRevision: "0" })).status, 200);
   let response = await f.call(`${base}/export`);
   assert.equal(response.status, 200);
-  assert.match(
-    response.headers.get("content-disposition"),
-    /attachment.*\.json/,
-  );
+  assert.match(response.headers.get("content-disposition"), /attachment.*\.json/);
   assert.deepEqual(await response.json(), [entry]);
   const commands = [
     { ...entry, response: "Updated", enabled: true },
@@ -335,10 +310,7 @@ test("Quick Command backup routes export the complete portable list and import w
     ).status,
     403,
   );
-  assert.equal(
-    (await f.call("/dashboard/api/guilds/2/quick-commands/export")).status,
-    404,
-  );
+  assert.equal((await f.call("/dashboard/api/guilds/2/quick-commands/export")).status, 404);
   response = await f.call(`${base}/import`, "POST", input);
   assert.equal(response.status, 200);
   assert.equal((await response.json()).quickCommands.length, 2);
@@ -358,7 +330,7 @@ test("Quick Command backup routes export the complete portable list and import w
   assert.equal((await f.call(`${base}/export`)).status, 200);
   assert.equal((await f.call(`${base}/import`, "POST", input)).status, 503);
 });
-test("backup import accepts complete lists larger than the normal JSON body limit", async (t) => {
+void test("backup import accepts complete lists larger than the normal JSON body limit", async (t) => {
   const f = await fixture(t),
     base = "/dashboard/api/guilds/1/quick-commands";
   const commands = Array.from({ length: 50 }, (_, i) => ({
@@ -366,9 +338,7 @@ test("backup import accepts complete lists larger than the normal JSON body limi
     response: "x".repeat(2000),
     enabled: i % 2 === 0,
   }));
-  const expectedRevisions = Object.fromEntries(
-    commands.map((command) => [command.trigger, "0"]),
-  );
+  const expectedRevisions = Object.fromEntries(commands.map((command) => [command.trigger, "0"]));
   const response = await f.call(`${base}/import`, "POST", {
     commands,
     expectedRevisions,
@@ -376,9 +346,7 @@ test("backup import accepts complete lists larger than the normal JSON body limi
   assert.equal(response.status, 200);
   assert.equal((await response.json()).quickCommands.length, 50);
   assert.deepEqual(
-    (await (await f.call(`${base}/export`)).json())
-      .map((row) => row.trigger)
-      .sort(),
+    (await (await f.call(`${base}/export`)).json()).map((row) => row.trigger).sort(),
     commands.map((row) => row.trigger).sort(),
   );
 });

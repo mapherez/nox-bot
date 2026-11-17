@@ -30,8 +30,7 @@ export async function sqliteFixture(t, retryMs = 20) {
 export async function untilSqlite(predicate, timeout = 5000) {
   const deadline = Date.now() + timeout;
   while (!predicate()) {
-    if (Date.now() >= deadline)
-      throw new Error("SQLite integration condition timed out.");
+    if (Date.now() >= deadline) throw new Error("SQLite integration condition timed out.");
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }

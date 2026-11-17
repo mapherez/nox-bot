@@ -1,9 +1,4 @@
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 import type { Session, StateStore } from "./state.js";
 import { registerSecret } from "../utils/logger.js";
@@ -65,8 +60,7 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
     origin.pathname !== "/" ||
     origin.search ||
     origin.hash ||
-    (origin.protocol !== "https:" &&
-      !(origin.protocol === "http:" && allowsHttp(origin.hostname)))
+    (origin.protocol !== "https:" && !(origin.protocol === "http:" && allowsHttp(origin.hostname)))
   )
     throw new Error(
       "Dashboard URL must be an HTTPS origin, or HTTP on localhost or a private LAN IP.",
@@ -74,13 +68,8 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
   validateId(env.DISCORD_CLIENT_ID);
   validateId(env.NOX_BOT_OWNER_DISCORD_USER_ID);
   const bytes = Buffer.from(env.NOX_BOT_SESSION_SECRET!, "base64");
-  if (
-    bytes.length !== 32 ||
-    bytes.toString("base64") !== env.NOX_BOT_SESSION_SECRET
-  )
-    throw new Error(
-      "NOX_BOT_SESSION_SECRET must be a canonical base64 encoded 32-byte key.",
-    );
+  if (bytes.length !== 32 || bytes.toString("base64") !== env.NOX_BOT_SESSION_SECRET)
+    throw new Error("NOX_BOT_SESSION_SECRET must be a canonical base64 encoded 32-byte key.");
   registerSecret(env.DISCORD_CLIENT_SECRET!);
   registerSecret(env.NOX_BOT_SESSION_SECRET!);
   return {
@@ -120,12 +109,7 @@ export class DiscordOAuth implements OAuthProvider {
         redirect_uri: `${this.config.origin}/auth/callback`,
       }),
     });
-    if (!token.ok)
-      throw new AuthError(
-        401,
-        "OAUTH_FAILED",
-        "Discord authentication failed.",
-      );
+    if (!token.ok) throw new AuthError(401, "OAUTH_FAILED", "Discord authentication failed.");
     const payload: unknown = await token.json();
     if (
       !payload ||
@@ -133,22 +117,14 @@ export class DiscordOAuth implements OAuthProvider {
       !("access_token" in payload) ||
       typeof payload.access_token !== "string"
     )
-      throw new AuthError(
-        401,
-        "OAUTH_FAILED",
-        "Discord authentication failed.",
-      );
+      throw new AuthError(401, "OAUTH_FAILED", "Discord authentication failed.");
     registerSecret(payload.access_token);
     const response = await this.request("https://discord.com/api/users/@me", {
       headers: { Authorization: `Bearer ${payload.access_token}` },
       signal: AbortSignal.timeout(10000),
     });
     if (!response.ok)
-      throw new AuthError(
-        401,
-        "OAUTH_FAILED",
-        "Discord identity could not be verified.",
-      );
+      throw new AuthError(401, "OAUTH_FAILED", "Discord identity could not be verified.");
     const user: unknown = await response.json();
     if (
       !user ||
@@ -160,17 +136,12 @@ export class DiscordOAuth implements OAuthProvider {
       typeof user.username !== "string" ||
       (user.avatar !== null && typeof user.avatar !== "string")
     )
-      throw new AuthError(
-        401,
-        "OAUTH_FAILED",
-        "Discord identity could not be verified.",
-      );
+      throw new AuthError(401, "OAUTH_FAILED", "Discord identity could not be verified.");
     validateId(user.id);
     return { id: user.id, username: user.username, avatar: user.avatar };
   }
 }
-const hash = (token: string) =>
-  createHash("sha256").update(token).digest("hex");
+const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 const equal = (a: string, b: string): boolean => {
   const left = Buffer.from(a),
     right = Buffer.from(b);
@@ -192,9 +163,7 @@ export class AuthService {
     private readonly now = Date.now,
   ) {
     this.secureCookie = config.origin.startsWith("https:");
-    this.sessionCookieName = this.secureCookie
-      ? "__Host-nox-session"
-      : "nox-session";
+    this.sessionCookieName = this.secureCookie ? "__Host-nox-session" : "nox-session";
   }
   async initializeOwner(): Promise<void> {
     const existing = this.state.get("user", "", this.config.ownerId);
@@ -241,26 +210,16 @@ export class AuthService {
       !expires ||
       expires < this.now()
     )
-      throw new AuthError(
-        401,
-        "OAUTH_STATE_INVALID",
-        "Invalid or expired login request.",
-      );
+      throw new AuthError(401, "OAUTH_STATE_INVALID", "Invalid or expired login request.");
     const identity = await this.oauth.identify(code);
     if (
       identity.id !== this.config.ownerId ||
       this.state.get("user", "", identity.id)?.data.role !== "owner"
     )
-      throw new AuthError(
-        403,
-        "ACCESS_DENIED",
-        "This dashboard is restricted to its owner.",
-      );
+      throw new AuthError(403, "ACCESS_DENIED", "This dashboard is restricted to its owner.");
     const token = randomBytes(32).toString("base64url");
     registerSecret(token);
-    const csrf = createHmac("sha256", this.config.sessionSecret)
-      .update(token)
-      .digest("base64url");
+    const csrf = createHmac("sha256", this.config.sessionSecret).update(token).digest("base64url");
     const session: Session = {
       hash: hash(token),
       userId: identity.id,
@@ -271,23 +230,11 @@ export class AuthService {
       expiresAt: this.now() + SESSION_AGE,
       lastSeenAt: this.now(),
     };
-    const changes = [
-      this.state.change("session", "", session.hash, session, "0"),
-    ];
+    const changes = [this.state.change("session", "", session.hash, session, "0")];
     if (previousToken) await this.touches.get(hash(previousToken));
-    const previous = previousToken
-      ? this.state.get("session", "", hash(previousToken))
-      : undefined;
+    const previous = previousToken ? this.state.get("session", "", hash(previousToken)) : undefined;
     if (previous && previousToken)
-      changes.push(
-        this.state.change(
-          "session",
-          "",
-          hash(previousToken),
-          null,
-          previous.revision,
-        ),
-      );
+      changes.push(this.state.change("session", "", hash(previousToken), null, previous.revision));
     await this.state.commit(changes);
     if (previousToken) this.revoked.add(hash(previousToken));
     return {
@@ -297,11 +244,7 @@ export class AuthService {
   }
   authenticate(token: string | undefined, touch = true): Session {
     if (!token || token.length > 128)
-      throw new AuthError(
-        401,
-        "AUTH_REQUIRED",
-        "Sign in with Discord to continue.",
-      );
+      throw new AuthError(401, "AUTH_REQUIRED", "Sign in with Discord to continue.");
     const sessionHash = hash(token),
       session = this.state.get("session", "", sessionHash)?.data;
     if (
@@ -311,11 +254,7 @@ export class AuthService {
       this.state.get("user", "", session.userId)?.data.role !== "owner" ||
       session.expiresAt <= this.now()
     )
-      throw new AuthError(
-        401,
-        "SESSION_EXPIRED",
-        "Your session has expired. Sign in again.",
-      );
+      throw new AuthError(401, "SESSION_EXPIRED", "Your session has expired. Sign in again.");
     if (
       touch &&
       this.state.writable &&
@@ -345,9 +284,7 @@ export class AuthService {
     }
     return session;
   }
-  async refreshSession(
-    token: string,
-  ): Promise<{ session: Session; cookie: string }> {
+  async refreshSession(token: string): Promise<{ session: Session; cookie: string }> {
     // Only extend the browser cookie after the server has confirmed the renewal.
     await this.touches.get(hash(token));
     const session = this.authenticate(token, false);
@@ -360,11 +297,7 @@ export class AuthService {
       ),
     };
   }
-  validateMutation(
-    session: Session,
-    origin: string | undefined,
-    csrf: string | undefined,
-  ): void {
+  validateMutation(session: Session, origin: string | undefined, csrf: string | undefined): void {
     if (origin !== this.config.origin || !csrf || !equal(session.csrf, csrf))
       throw new AuthError(
         403,
@@ -377,8 +310,7 @@ export class AuthService {
     try {
       await this.touches.get(session.hash);
       const revision = this.state.get("session", "", session.hash)?.revision;
-      if (revision)
-        await this.state.remove("session", "", session.hash, revision);
+      if (revision) await this.state.remove("session", "", session.hash, revision);
       this.revoked.add(hash(token));
       return this.cookie(this.sessionCookieName, "", 0);
     } finally {

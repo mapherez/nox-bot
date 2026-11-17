@@ -11,33 +11,20 @@ export class QuickCommandService {
       .sort((a, b) => a.data.trigger.localeCompare(b.data.trigger));
   }
   response(guildId: string, trigger: string): string | undefined {
-    const command = this.state.get(
-      "quick",
-      guildId,
-      trigger.toLowerCase(),
-    )?.data;
+    const command = this.state.get("quick", guildId, trigger.toLowerCase())?.data;
     return command?.enabled ? command.response : undefined;
   }
   export(guildId: string) {
     validateId(guildId);
     if (!this.state.initialized)
-      throw new StateError(
-        "STATE_UNAVAILABLE",
-        "Wait for confirmed commands before exporting.",
-      );
-    return this.list(guildId).map(
-      ({ data: { trigger, response, enabled } }) => ({
-        trigger,
-        response,
-        enabled,
-      }),
-    );
+      throw new StateError("STATE_UNAVAILABLE", "Wait for confirmed commands before exporting.");
+    return this.list(guildId).map(({ data: { trigger, response, enabled } }) => ({
+      trigger,
+      response,
+      enabled,
+    }));
   }
-  async import(
-    guildId: string,
-    value: unknown,
-    expectedRevisions: unknown,
-  ): Promise<number> {
+  async import(guildId: string, value: unknown, expectedRevisions: unknown): Promise<number> {
     validateId(guildId);
     if (!this.state.writable)
       throw new StateError(
@@ -55,30 +42,18 @@ export class QuickCommandService {
       typeof expectedRevisions !== "object" ||
       Array.isArray(expectedRevisions)
     )
-      throw new StateError(
-        "INVALID_STATE",
-        "Expected command revisions are required.",
-      );
+      throw new StateError("INVALID_STATE", "Expected command revisions are required.");
     const revisions = expectedRevisions as Record<string, unknown>;
     if (Object.keys(revisions).length !== commands.length)
-      throw new StateError(
-        "INVALID_STATE",
-        "Expected revisions must match the imported commands.",
-      );
+      throw new StateError("INVALID_STATE", "Expected revisions must match the imported commands.");
     // Validate the ENTIRE backup and its revision expectations before the first write.
     const changes = commands.map((command) => {
-      const revision = Object.prototype.hasOwnProperty.call(
-        revisions,
-        command.trigger,
-      )
+      const revision = Object.prototype.hasOwnProperty.call(revisions, command.trigger)
         ? revisions[command.trigger]
         : undefined;
       if (typeof revision !== "string" || !/^\d+$/.test(revision))
         throw new StateError("INVALID_STATE", "Invalid command revision.");
-      if (
-        (this.state.get("quick", guildId, command.trigger)?.revision ?? "0") !==
-        revision
-      )
+      if ((this.state.get("quick", guildId, command.trigger)?.revision ?? "0") !== revision)
         throw new StateError(
           "STATE_CONFLICT",
           "Commands changed after the import preview. Choose the file again to review the latest commands.",
@@ -96,34 +71,14 @@ export class QuickCommandService {
     return changes.length;
   }
 
-  async save(
-    guildId: string,
-    input: QuickCommand,
-    expectedRevision: string,
-  ): Promise<void> {
+  async save(guildId: string, input: QuickCommand, expectedRevision: string): Promise<void> {
     validateId(guildId);
-    if (input.guildId !== guildId)
-      throw new Error("Quick Command belongs to another server.");
+    if (input.guildId !== guildId) throw new Error("Quick Command belongs to another server.");
     const data = { ...input, trigger: input.trigger.trim().toLowerCase() };
-    await this.state.put(
-      "quick",
-      guildId,
-      data.trigger,
-      data,
-      expectedRevision,
-    );
+    await this.state.put("quick", guildId, data.trigger, data, expectedRevision);
   }
-  async delete(
-    guildId: string,
-    trigger: string,
-    expectedRevision: string,
-  ): Promise<void> {
+  async delete(guildId: string, trigger: string, expectedRevision: string): Promise<void> {
     validateId(guildId);
-    await this.state.remove(
-      "quick",
-      guildId,
-      trigger.toLowerCase(),
-      expectedRevision,
-    );
+    await this.state.remove("quick", guildId, trigger.toLowerCase(), expectedRevision);
   }
 }

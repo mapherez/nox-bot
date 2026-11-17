@@ -45,9 +45,7 @@ function QuickForm({
     [enabled, setEnabled] = useState(command.enabled),
     [invalid, setInvalid] = useState("");
   const dirty =
-    trigger !== command.trigger ||
-    response !== command.response ||
-    enabled !== command.enabled;
+    trigger !== command.trigger || response !== command.response || enabled !== command.enabled;
   useEffect(() => onDirty(dirty), [dirty, onDirty]);
   return (
     <form
@@ -79,8 +77,8 @@ function QuickForm({
       <section>
         <h3>A shortcut for the things you say often.</h3>
         <p className={s.hint}>
-          Quick Commands send a public message and attempt to clean up the
-          input. Extra arguments are ignored.
+          Quick Commands send a public message and attempt to clean up the input. Extra arguments
+          are ignored.
         </p>
         <label htmlFor="quick-trigger">Trigger</label>
         <div className={s.inputPrefix}>
@@ -96,9 +94,7 @@ function QuickForm({
             spellCheck={false}
           />
         </div>
-        <p className={s.hint}>
-          Case insensitive. The trigger “help” is reserved.
-        </p>
+        <p className={s.hint}>Case insensitive. The trigger “help” is reserved.</p>
         <label htmlFor="quick-response">Response</label>
         <textarea
           id="quick-response"
@@ -115,23 +111,16 @@ function QuickForm({
         <div className={s.sectionHeading}>
           <div>
             <h3>Enabled</h3>
-            <p className={s.hint}>
-              Include this command in !help and /nox commands.
-            </p>
+            <p className={s.hint}>Include this command in !help and /nox commands.</p>
           </div>
-          <Switch
-            checked={enabled}
-            label="Enable Quick Command"
-            onChange={setEnabled}
-          />
+          <Switch checked={enabled} label="Enable Quick Command" onChange={setEnabled} />
         </div>
       </section>
       {invalid && <Notice error>{invalid}</Notice>}
       {error && <Notice error>{error}</Notice>}
       {!writable && (
         <Notice>
-          Reconnecting — configuration changes temporarily unavailable. Your
-          draft is kept here.
+          Reconnecting — configuration changes temporarily unavailable. Your draft is kept here.
         </Notice>
       )}
       <button type="submit" hidden disabled={!writable || saving}>
@@ -175,11 +164,7 @@ export default function App() {
         if (!active) return;
         if (cause instanceof ApiError && cause.status === 401) setSession(null);
         else {
-          setFatal(
-            cause instanceof Error
-              ? cause.message
-              : "Could not connect to the dashboard.",
-          );
+          setFatal(cause instanceof Error ? cause.message : "Could not connect to the dashboard.");
           setSession(null);
         }
       });
@@ -197,9 +182,7 @@ export default function App() {
     const apply = (value: GuildSnapshot) => {
       if (!active || selected.current !== value.guildId) return;
       setSnapshot((previous) =>
-        previous && BigInt(value.revision) < BigInt(previous.revision)
-          ? previous
-          : value,
+        previous && BigInt(value.revision) < BigInt(previous.revision) ? previous : value,
       );
     };
     void request<GuildSnapshot>(`/dashboard/api/guilds/${guildId}`)
@@ -233,20 +216,17 @@ export default function App() {
   }, [guildId, session]);
   const writable = !!snapshot?.writable && connected,
     server = guilds.find((guild) => guild.id === guildId);
-  async function mutate(
-    path: string,
-    method: string,
-    body: unknown,
-  ): Promise<boolean> {
+  async function mutate(path: string, method: string, body: unknown): Promise<boolean> {
     if (!session || !writable) return false;
     setSaving(true);
     setError("");
     setNotice("");
     try {
-      const value = await request<GuildSnapshot>(
-        `/dashboard/api/guilds/${guildId}/${path}`,
-        { method, body, csrf: session.csrf },
-      );
+      const value = await request<GuildSnapshot>(`/dashboard/api/guilds/${guildId}/${path}`, {
+        method,
+        body,
+        csrf: session.csrf,
+      });
       if (selected.current === value.guildId) setSnapshot(value);
       setNotice("Changes saved.");
       return true;
@@ -276,11 +256,7 @@ export default function App() {
     setError("");
   }
   function changeGuild(value: string) {
-    if (
-      editing &&
-      dirty &&
-      !window.confirm("Discard your unsaved changes and switch servers?")
-    )
+    if (editing && dirty && !window.confirm("Discard your unsaved changes and switch servers?"))
       return;
     close();
     setGuildId(value);
@@ -289,8 +265,7 @@ export default function App() {
     const url = snapshot?.mcp.url;
     if (!url) return;
     try {
-      if (!navigator.clipboard?.writeText)
-        throw new Error("Clipboard unavailable");
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(url);
       if (selected.current === guildId) setNotice("MCP URL copied.");
     } catch {
@@ -312,10 +287,7 @@ export default function App() {
       setDirty(false);
     }
   }
-  async function savePlugin(
-    settings: Settings,
-    secrets?: Record<string, string | null>,
-  ) {
+  async function savePlugin(settings: Settings, secrets?: Record<string, string | null>) {
     if (editing?.type !== "plugin") return false;
     const ok = await mutate(`plugins/${editing.plugin.id}/settings`, "PUT", {
       settings,
@@ -376,13 +348,10 @@ export default function App() {
           </h1>
           <p>One home for your servers, plugins and everyday shortcuts.</p>
           {new URLSearchParams(location.search).get("auth") === "denied" ? (
-            <Notice error>
-              Access denied. Only the configured owner can use this dashboard.
-            </Notice>
+            <Notice error>Access denied. Only the configured owner can use this dashboard.</Notice>
           ) : new URLSearchParams(location.search).get("auth") === "failed" ? (
             <Notice error>
-              Your login request expired or could not be verified. Please try
-              again.
+              Your login request expired or could not be verified. Please try again.
             </Notice>
           ) : null}
           {fatal && <Notice error>{fatal}</Notice>}
@@ -395,12 +364,8 @@ export default function App() {
       </main>
     );
   const activeCount =
-    snapshot?.plugins.filter((plugin) => plugin.configuration.enabled).length ??
-    0;
-  const Panel =
-    editing?.type === "plugin"
-      ? panels[editing.plugin.dashboardEntry]
-      : undefined;
+    snapshot?.plugins.filter((plugin) => plugin.configuration.enabled).length ?? 0;
+  const Panel = editing?.type === "plugin" ? panels[editing.plugin.dashboardEntry] : undefined;
   return (
     <div className={s.shell}>
       <aside className={s.sidebar}>
@@ -450,9 +415,7 @@ export default function App() {
             {writable ? "Configuration synced" : "Sync reconnecting"}
           </div>
           <div className={s.profile}>
-            <span className={s.avatar}>
-              {session.user.username.slice(0, 1).toUpperCase()}
-            </span>
+            <span className={s.avatar}>{session.user.username.slice(0, 1).toUpperCase()}</span>
             <div>
               <strong>{session.user.username}</strong>
               <span>Owner</span>
@@ -477,11 +440,7 @@ export default function App() {
           </div>
           <div>
             <Badge tone="purple">NoX Bot</Badge>
-            <button
-              className={s.mobileLogout}
-              disabled={!writable}
-              onClick={signOut}
-            >
+            <button className={s.mobileLogout} disabled={!writable} onClick={signOut}>
               Sign out
             </button>
           </div>
@@ -529,8 +488,7 @@ export default function App() {
                     writable={writable}
                     saving={saving}
                     onImported={(value) => {
-                      if (selected.current === value.guildId)
-                        setSnapshot(value);
+                      if (selected.current === value.guildId) setSnapshot(value);
                     }}
                     onNotice={(value) => {
                       if (selected.current === guildId) setNotice(value);
@@ -577,11 +535,7 @@ export default function App() {
                 <article>
                   <span>Quick Commands</span>
                   <strong>
-                    {
-                      snapshot.quickCommands.filter(
-                        (command) => command.enabled,
-                      ).length
-                    }
+                    {snapshot.quickCommands.filter((command) => command.enabled).length}
                   </strong>
                   <p>Everyday shortcuts, ready to send</p>
                 </article>
@@ -607,9 +561,7 @@ export default function App() {
                       <h2>{server?.name}</h2>
                       <p>Your Discord server</p>
                     </div>
-                    <span className={s.serverMark}>
-                      {server?.name.slice(0, 2).toUpperCase()}
-                    </span>
+                    <span className={s.serverMark}>{server?.name.slice(0, 2).toUpperCase()}</span>
                   </div>
                   <dl className={s.details}>
                     <div>
@@ -622,9 +574,7 @@ export default function App() {
                             void navigator.clipboard
                               .writeText(guildId)
                               .then(() => setNotice("Server ID copied."))
-                              .catch(() =>
-                                setNotice("Select the server ID to copy it."),
-                              )
+                              .catch(() => setNotice("Select the server ID to copy it."))
                           }
                         >
                           Copy
@@ -652,14 +602,8 @@ export default function App() {
                     <br />
                     better conversations.
                   </h2>
-                  <p>
-                    Add a shortcut for your rules, links or frequently asked
-                    questions.
-                  </p>
-                  <button
-                    className={s.secondary}
-                    onClick={() => setPage("Quick Commands")}
-                  >
+                  <p>Add a shortcut for your rules, links or frequently asked questions.</p>
+                  <button className={s.secondary} onClick={() => setPage("Quick Commands")}>
                     Explore Quick Commands <span aria-hidden="true">→</span>
                   </button>
                 </section>
@@ -716,8 +660,7 @@ export default function App() {
                   </div>
                 ) : (
                   <p className={s.hint}>
-                    No sendable channels are available. Check the bot’s Discord
-                    permissions.
+                    No sendable channels are available. Check the bot’s Discord permissions.
                   </p>
                 )}
               </section>
@@ -726,8 +669,7 @@ export default function App() {
             <>
               <div className={s.sectionHeading}>
                 <p className={s.hint}>
-                  Built-in collection{" "}
-                  <span>· {snapshot.plugins.length} plugins</span>
+                  Built-in collection <span>· {snapshot.plugins.length} plugins</span>
                 </p>
                 <Badge>{activeCount} enabled</Badge>
               </div>
@@ -780,16 +722,14 @@ export default function App() {
                       </button>
                     </footer>
                     {plugin.configuration.error && (
-                      <p className={s.fieldError}>
-                        {plugin.configuration.error}
-                      </p>
+                      <p className={s.fieldError}>{plugin.configuration.error}</p>
                     )}
                   </article>
                 ))}
               </div>
               <p className={s.collectionNote}>
-                Enabled plugins automatically add their commands to this server.
-                All plugin responses are private.
+                Enabled plugins automatically add their commands to this server. All plugin
+                responses are private.
               </p>
             </>
           ) : (
@@ -797,9 +737,7 @@ export default function App() {
               <div className={s.sectionHeading}>
                 <div>
                   <h2>Your shortcuts</h2>
-                  <p>
-                    Available through !help and the private /nox commands menu.
-                  </p>
+                  <p>Available through !help and the private /nox commands menu.</p>
                 </div>
                 <Badge>{snapshot.quickCommands.length} commands</Badge>
               </div>
@@ -807,10 +745,7 @@ export default function App() {
                 <div className={s.empty}>
                   <span>⌘</span>
                   <h2>Your first shortcut starts here</h2>
-                  <p>
-                    Add a command for a useful link, server rule or recurring
-                    answer.
-                  </p>
+                  <p>Add a command for a useful link, server rule or recurring answer.</p>
                   <button
                     className={s.secondary}
                     disabled={!writable}
@@ -850,9 +785,7 @@ export default function App() {
                             <code>!{command.trigger}</code>
                           </th>
                           <td>
-                            <p className={s.responseExcerpt}>
-                              {command.response}
-                            </p>
+                            <p className={s.responseExcerpt}>{command.response}</p>
                           </td>
                           <td>
                             <Badge tone={command.enabled ? "green" : "muted"}>
@@ -863,15 +796,10 @@ export default function App() {
                             <div className={s.rowActions}>
                               <button
                                 className={s.textButton}
-                                onClick={() =>
-                                  open({ type: "quick", command, fresh: false })
-                                }
+                                onClick={() => open({ type: "quick", command, fresh: false })}
                               >
                                 Edit
-                                <span className={s.srOnly}>
-                                  {" "}
-                                  !{command.trigger}
-                                </span>
+                                <span className={s.srOnly}> !{command.trigger}</span>
                               </button>
                               <button
                                 className={s.deleteButton}
@@ -883,11 +811,9 @@ export default function App() {
                                       `Delete !${command.trigger}? This removes its saved response.`,
                                     )
                                   )
-                                    void mutate(
-                                      `quick-commands/${command.trigger}`,
-                                      "DELETE",
-                                      { expectedRevision: command.revision },
-                                    );
+                                    void mutate(`quick-commands/${command.trigger}`, "DELETE", {
+                                      expectedRevision: command.revision,
+                                    });
                                 }}
                               >
                                 ×
@@ -933,14 +859,8 @@ export default function App() {
               <button
                 className={s.primary}
                 type="submit"
-                form={
-                  editing.type === "plugin"
-                    ? "plugin-settings"
-                    : "quick-settings"
-                }
-                disabled={
-                  !writable || saving || (editing.type === "plugin" && !dirty)
-                }
+                form={editing.type === "plugin" ? "plugin-settings" : "quick-settings"}
+                disabled={!writable || saving || (editing.type === "plugin" && !dirty)}
               >
                 {saving
                   ? "Saving…"
@@ -953,9 +873,7 @@ export default function App() {
         >
           {editing.type === "plugin" ? (
             Panel ? (
-              <Suspense
-                fallback={<p role="status">Loading plugin settings…</p>}
-              >
+              <Suspense fallback={<p role="status">Loading plugin settings…</p>}>
                 <Panel
                   plugin={editing.plugin}
                   guildId={guildId}
@@ -968,9 +886,7 @@ export default function App() {
                 />
               </Suspense>
             ) : (
-              <Notice error>
-                This plugin’s dashboard entry is unavailable.
-              </Notice>
+              <Notice error>This plugin’s dashboard entry is unavailable.</Notice>
             )
           ) : (
             <QuickForm

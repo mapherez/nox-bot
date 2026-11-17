@@ -1,8 +1,7 @@
 import type { APIApplicationCommandOption, APIEmbed } from "discord.js";
 import type { Settings } from "../core/state.js";
 
-export type Capability =
-  "http" | "attachments" | "discord-users" | "interactive" | "voice";
+export type Capability = "http" | "attachments" | "discord-users" | "interactive" | "voice";
 export interface PluginCommand {
   name: string;
   description: string;
@@ -70,9 +69,7 @@ export interface PluginRuntime {
   components?: Record<string, (context: PluginContext) => Promise<RichContent>>;
   autocomplete?: Record<
     string,
-    (
-      context: PluginContext,
-    ) => Promise<Array<{ name: string; value: string | number }>>
+    (context: PluginContext) => Promise<Array<{ name: string; value: string | number }>>
   >;
   activate?(): Promise<void>;
   configure?(guilds: readonly string[]): Promise<void>;

@@ -87,8 +87,7 @@ export function Drawer({
       onClick={(event) => {
         if (event.target === ref.current) {
           const rect = ref.current.getBoundingClientRect();
-          if (event.clientX < rect.left || event.clientX > rect.right)
-            askClose();
+          if (event.clientX < rect.left || event.clientX > rect.right) askClose();
         }
       }}
     >
@@ -99,11 +98,7 @@ export function Drawer({
             <h2 id="drawer-title">{title}</h2>
             <p id="drawer-description">{subtitle}</p>
           </div>
-          <button
-            className={s.iconButton}
-            aria-label="Close configuration"
-            onClick={askClose}
-          >
+          <button className={s.iconButton} aria-label="Close configuration" onClick={askClose}>
             ×
           </button>
         </header>
@@ -118,18 +113,9 @@ export function Drawer({
     </dialog>
   );
 }
-export function Notice({
-  children,
-  error = false,
-}: {
-  children: ReactNode;
-  error?: boolean;
-}) {
+export function Notice({ children, error = false }: { children: ReactNode; error?: boolean }) {
   return (
-    <div
-      className={`${s.notice} ${error ? s.error : ""}`}
-      role={error ? "alert" : "status"}
-    >
+    <div className={`${s.notice} ${error ? s.error : ""}`} role={error ? "alert" : "status"}>
       {children}
     </div>
   );

@@ -53,9 +53,7 @@ export class EngineAudio {
               failure();
               return;
             }
-            this.output.write(
-              encoder.encode(pcm.subarray(offset, offset + 3840)),
-            );
+            this.output.write(encoder.encode(pcm.subarray(offset, offset + 3840)));
           }
         } catch {
           failure();

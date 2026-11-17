@@ -101,7 +101,7 @@ function env(dir, port) {
     NOX_VOICE_CLIENT_KEY_FILE: join(dir, "client.key"),
   };
 }
-test("controller uses real mTLS for HTTP and audio, preserves settings, and never follows redirects", async (t) => {
+void test("controller uses real mTLS for HTTP and audio, preserves settings, and never follows redirects", async (t) => {
   const dir = await certificates(t),
     seen = [];
   const https = await server(t, dir, "server", async (req, res) => {
@@ -123,16 +123,12 @@ test("controller uses real mTLS for HTTP and audio, preserves settings, and neve
     res.end(JSON.stringify(value));
   });
   const ws = new WebSocketServer({ server: https, path: "/ws" });
-  ws.on("connection", (socket) =>
-    socket.on("message", (data) => socket.send(data)),
-  );
+  ws.on("connection", (socket) => socket.on("message", (data) => socket.send(data)));
   t.after(() => {
     for (const client of ws.clients) client.terminate();
     ws.close();
   });
-  const controller = await VoiceController.fromEnvironment(
-    env(dir, https.address().port),
-  );
+  const controller = await VoiceController.fromEnvironment(env(dir, https.address().port));
   assert.equal((await controller.status()).state, "ready");
   const settings = { voice: "NATM1", prompt: "Test", bits: 8 };
   assert.deepEqual(await controller.update(settings), settings);
@@ -149,16 +145,14 @@ test("controller uses real mTLS for HTTP and audio, preserves settings, and neve
     ["GET", "/api/diagnostics"],
   ]);
 });
-test("controller rejects wrong hostname, invalid client identity, and malformed/unreadable key config", async (t) => {
+void test("controller rejects wrong hostname, invalid client identity, and malformed/unreadable key config", async (t) => {
   const dir = await certificates(t);
   let requests = 0;
   const wrong = await server(t, dir, "wrong-host", (_req, res) => {
     requests++;
     res.end("{}");
   });
-  const wrongController = await VoiceController.fromEnvironment(
-    env(dir, wrong.address().port),
-  );
+  const wrongController = await VoiceController.fromEnvironment(env(dir, wrong.address().port));
   await assert.rejects(wrongController.status(), /certificates/);
   assert.equal(requests, 0);
   const https = await server(t, dir, "server", (_req, res) => {
@@ -182,15 +176,12 @@ test("controller rejects wrong hostname, invalid client identity, and malformed/
   );
 });
 
-test("readable malformed TLS keys are reported as optional voice configuration errors", async (t) => {
+void test("readable malformed TLS keys are reported as optional voice configuration errors", async (t) => {
   const parent = resolve(".tmp");
   await mkdir(parent, { recursive: true });
   const dir = await mkdtemp(join(parent, "voice-invalid-tls-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   for (const file of ["ca.crt", "client.crt", "client.key"])
     await writeFile(join(dir, file), "invalid test fixture");
-  await assert.rejects(
-    VoiceController.fromEnvironment(env(dir, 8443)),
-    /configuration is invalid/,
-  );
+  await assert.rejects(VoiceController.fromEnvironment(env(dir, 8443)), /configuration is invalid/);
 });

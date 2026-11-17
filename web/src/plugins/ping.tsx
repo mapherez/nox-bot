@@ -13,8 +13,8 @@ export default function PingPanel(_: PluginPanelProps) {
       <section>
         <h3>Instant feedback</h3>
         <p>
-          Ping reports interaction latency with a private response. Useful when
-          checking that your server's bot is responding.
+          Ping reports interaction latency with a private response. Useful when checking that your
+          server's bot is responding.
         </p>
         <div className={s.commandPreview}>
           <code>/ping</code>

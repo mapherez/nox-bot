@@ -20,7 +20,9 @@ export async function resolveRuntimeVersion(
 
 export function createServiceInfo(version: string): ServiceInfo {
   return Object.freeze({
-    service: "nox-bot", version, apiVersion: "v1",
+    service: "nox-bot",
+    version,
+    apiVersion: "v1",
     capabilities: Object.freeze(["discord-status", "guilds", "channels", "messages"]),
   });
 }

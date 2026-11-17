@@ -12,11 +12,7 @@ class Transport {
     await this.snapshot();
   }
   async snapshot() {
-    await this.callbacks.snapshot(
-      [...this.rows.values()],
-      this.sequence,
-      this.generation,
-    );
+    await this.callbacks.snapshot([...this.rows.values()], this.sequence, this.generation);
   }
   async mutate(changes) {
     for (const c of changes)
@@ -31,7 +27,7 @@ class Transport {
   }
   async close() {}
 }
-test("confirmed Quick Commands are isolated, editable immediately and remain available through database loss", async () => {
+void test("confirmed Quick Commands are isolated, editable immediately and remain available through database loss", async () => {
   const transport = new Transport(),
     store = new StateStore(transport);
   await store.start();
@@ -66,7 +62,7 @@ test("confirmed Quick Commands are isolated, editable immediately and remain ava
   assert.equal(store.get("quick", "2", "hello").data.response, "Hello B");
   await store.close();
 });
-test("unconfirmed and rejected writes never update the confirmed projection", async () => {
+void test("unconfirmed and rejected writes never update the confirmed projection", async () => {
   const transport = new Transport(),
     store = new StateStore(transport);
   await store.start();
@@ -86,7 +82,7 @@ test("unconfirmed and rejected writes never update the confirmed projection", as
   assert.deepEqual(store.list("quick"), []);
   await store.close();
 });
-test("old connections and regressing revisions cannot overwrite the latest projection", async () => {
+void test("old connections and regressing revisions cannot overwrite the latest projection", async () => {
   const transport = new Transport(),
     store = new StateStore(transport);
   await store.start();
@@ -105,7 +101,7 @@ test("old connections and regressing revisions cannot overwrite the latest proje
   assert.equal(store.get("quick", "1", "hello").data.response, "latest");
   await store.close();
 });
-test("writes remain closed until lifecycle projections finish, including a second socket loss", async () => {
+void test("writes remain closed until lifecycle projections finish, including a second socket loss", async () => {
   const transport = new Transport(),
     store = new StateStore(transport);
   let release;
@@ -121,19 +117,11 @@ test("writes remain closed until lifecycle projections finish, including a secon
   assert.equal(store.synchronization, "reconnecting");
   await store.close();
 });
-test("plugin secrets are encrypted with guild/plugin/field binding", () => {
+void test("plugin secrets are encrypted with guild/plugin/field binding", () => {
   const vault = new SecretVault(randomBytes(32).toString("base64"));
-  const encrypted = vault.encrypt(
-    "private-weather-key",
-    "1",
-    "weather",
-    "apiKey",
-  );
+  const encrypted = vault.encrypt("private-weather-key", "1", "weather", "apiKey");
   assert.equal(encrypted.includes("private-weather-key"), false);
-  assert.equal(
-    vault.decrypt(encrypted, "1", "weather", "apiKey"),
-    "private-weather-key",
-  );
+  assert.equal(vault.decrypt(encrypted, "1", "weather", "apiKey"), "private-weather-key");
   assert.throws(() => vault.decrypt(encrypted, "2", "weather", "apiKey"));
   assert.throws(() => vault.decrypt(encrypted, "1", "dictionary", "apiKey"));
   assert.throws(() => new SecretVault("short"));

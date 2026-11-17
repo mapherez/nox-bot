@@ -7,8 +7,7 @@ export function validateRichContent(
   if (
     !isRecord(value) ||
     Object.keys(value).some(
-      (key) =>
-        !["content", "embeds", "components", "attachments"].includes(key),
+      (key) => !["content", "embeds", "components", "attachments"].includes(key),
     )
   )
     throw new Error("Invalid plugin response contract.");
@@ -17,10 +16,7 @@ export function validateRichContent(
     (typeof value.content !== "string" || value.content.length > 2000)
   )
     throw new Error("Invalid plugin text.");
-  if (
-    value.embeds !== undefined &&
-    (!Array.isArray(value.embeds) || value.embeds.length > 10)
-  )
+  if (value.embeds !== undefined && (!Array.isArray(value.embeds) || value.embeds.length > 10))
     throw new Error("Invalid plugin embeds.");
   let textSize = 0;
   for (const embed of (value.embeds ?? []) as unknown[]) {
@@ -44,19 +40,13 @@ export function validateRichContent(
     )
       throw new Error("Invalid embed contract.");
     const text = (input: unknown, limit: number) => {
-      if (
-        input !== undefined &&
-        (typeof input !== "string" || input.length > limit)
-      )
+      if (input !== undefined && (typeof input !== "string" || input.length > limit))
         throw new Error("Invalid embed text.");
       textSize += typeof input === "string" ? input.length : 0;
     };
     text(embed.title, 256);
     text(embed.description, 4096);
-    if (
-      embed.fields !== undefined &&
-      (!Array.isArray(embed.fields) || embed.fields.length > 25)
-    )
+    if (embed.fields !== undefined && (!Array.isArray(embed.fields) || embed.fields.length > 25))
       throw new Error("Invalid embed fields.");
     for (const field of (embed.fields ?? []) as unknown[]) {
       if (!isRecord(field)) throw new Error("Invalid embed field.");
@@ -143,8 +133,7 @@ export function validateRichContent(
         throw new Error("Invalid plugin attachment.");
       size += file.data.length;
     }
-    if (size > 25 * 1024 * 1024)
-      throw new Error("Plugin attachments exceed message limits.");
+    if (size > 25 * 1024 * 1024) throw new Error("Plugin attachments exceed message limits.");
   }
   if (
     !value.content &&

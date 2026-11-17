@@ -19,17 +19,10 @@ import {
   type ChannelSummary,
   type CreatedMessage,
 } from "../controlApi.js";
-import type {
-  MessagingAdapter,
-  MessageTarget,
-  MessageReceipt,
-} from "../core/messaging.js";
+import type { MessagingAdapter, MessageTarget, MessageReceipt } from "../core/messaging.js";
 import type { RichContent } from "../plugins/sdk.js";
 
-type OperationsClient = Pick<
-  Client,
-  "isReady" | "ws" | "user" | "guilds" | "channels"
-> &
+type OperationsClient = Pick<Client, "isReady" | "ws" | "user" | "guilds" | "channels"> &
   Partial<Pick<Client, "users">>;
 type SendableChannel = TextChannel | NewsChannel;
 const sortById = <T extends { id: string }>(items: T[]): T[] =>
@@ -50,25 +43,13 @@ export function translateDiscordError(error: unknown): ControlError {
           "The bot cannot access or send to this resource.",
         );
       case 50035:
-        return new ControlError(
-          "INVALID_PAYLOAD",
-          "Discord rejected the message payload.",
-        );
+        return new ControlError("INVALID_PAYLOAD", "Discord rejected the message payload.");
       case 200000:
-        return new ControlError(
-          "MESSAGE_REJECTED",
-          "Discord blocked the message.",
-        );
+        return new ControlError("MESSAGE_REJECTED", "Discord blocked the message.");
     }
   }
-  if (
-    (error instanceof HTTPError || error instanceof DiscordAPIError) &&
-    error.status >= 500
-  ) {
-    return new ControlError(
-      "DISCORD_UNAVAILABLE",
-      "Discord is temporarily unavailable.",
-    );
+  if ((error instanceof HTTPError || error instanceof DiscordAPIError) && error.status >= 500) {
+    return new ControlError("DISCORD_UNAVAILABLE", "Discord is temporarily unavailable.");
   }
   if (
     error &&
@@ -85,18 +66,13 @@ export function translateDiscordError(error: unknown): ControlError {
       "UND_ERR_SOCKET",
     ].includes(String(error.code))
   ) {
-    return new ControlError(
-      "DISCORD_UNAVAILABLE",
-      "The Discord request could not be completed.",
-    );
+    return new ControlError("DISCORD_UNAVAILABLE", "The Discord request could not be completed.");
   }
   // discord.js queues rate limits internally. Do not synthesize a 429 from an event or a delay.
   return new ControlError("INTERNAL_ERROR", "An unexpected error occurred.");
 }
 
-export default class DiscordOperations
-  implements DiscordOperationsContract, MessagingAdapter
-{
+export default class DiscordOperations implements DiscordOperationsContract, MessagingAdapter {
   readonly provider = "discord" as const;
   constructor(private readonly client: OperationsClient) {}
 
@@ -107,20 +83,16 @@ export default class DiscordOperations
       ? "connected"
       : [Status.Reconnecting, Status.Resuming].includes(ws.status)
         ? "reconnecting"
-        : [
-              Status.Connecting,
-              Status.Identifying,
-              Status.Nearly,
-              Status.WaitingForGuilds,
-            ].includes(ws.status)
+        : [Status.Connecting, Status.Identifying, Status.Nearly, Status.WaitingForGuilds].includes(
+              ws.status,
+            )
           ? "connecting"
           : "disconnected";
     return {
       discord: {
         state,
         ready,
-        pingMs:
-          ready && Number.isFinite(ws.ping) && ws.ping >= 0 ? ws.ping : null,
+        pingMs: ready && Number.isFinite(ws.ping) && ws.ping >= 0 ? ws.ping : null,
       },
       bot: this.client.user
         ? { id: this.client.user.id, username: this.client.user.username }
@@ -138,26 +110,15 @@ export default class DiscordOperations
     const guild = this.client.guilds.cache.get(id);
     if (!guild) throw new ControlError("GUILD_NOT_FOUND", "Guild not found.");
     if (!guild.available)
-      throw new ControlError(
-        "DISCORD_UNAVAILABLE",
-        "The guild is temporarily unavailable.",
-      );
+      throw new ControlError("DISCORD_UNAVAILABLE", "The guild is temporarily unavailable.");
     return guild;
   }
 
   private canSend(channel: SendableChannel, member: GuildMember): boolean {
     const permissions = channel.permissionsFor(member);
-    if (
-      !permissions?.has([
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-      ])
-    )
+    if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages]))
       return false;
-    return (
-      !member.isCommunicationDisabled() ||
-      permissions.has(PermissionFlagsBits.Administrator)
-    );
+    return !member.isCommunicationDisabled() || permissions.has(PermissionFlagsBits.Administrator);
   }
 
   async listGuilds() {
@@ -190,8 +151,7 @@ export default class DiscordOperations
           result.push({
             id: channel.id,
             name: channel.name,
-            type:
-              channel.type === ChannelType.GuildText ? "text" : "announcement",
+            type: channel.type === ChannelType.GuildText ? "text" : "announcement",
           });
         }
       }
@@ -227,10 +187,7 @@ export default class DiscordOperations
       if (target.kind === "dm") {
         validateId(target.userId);
         if (!this.client.users)
-          throw new ControlError(
-            "DISCORD_UNAVAILABLE",
-            "Discord users are unavailable.",
-          );
+          throw new ControlError("DISCORD_UNAVAILABLE", "Discord users are unavailable.");
         const user = await this.client.users.fetch(target.userId);
         signal?.throwIfAborted();
         const message = await user.send(payload);
@@ -243,10 +200,7 @@ export default class DiscordOperations
       validateId(target.guildId);
       validateId(target.channelId);
       this.getGuild(target.guildId);
-      const { channel, guild } = await this.sendable(
-        target.channelId,
-        target.guildId,
-      );
+      const { channel, guild } = await this.sendable(target.channelId, target.guildId);
       signal?.throwIfAborted();
       const message = await channel.send(payload);
       return {
@@ -259,10 +213,7 @@ export default class DiscordOperations
       throw translateDiscordError(error);
     }
   }
-  async sendMessage(
-    channelId: string,
-    content: string,
-  ): Promise<CreatedMessage> {
+  async sendMessage(channelId: string, content: string): Promise<CreatedMessage> {
     validateId(channelId);
     validateContent(content);
     this.assertReady();
@@ -285,22 +236,15 @@ export default class DiscordOperations
     const channel = await this.client.channels.fetch(channelId, {
       force: true,
     });
-    if (!channel)
-      throw new ControlError("CHANNEL_NOT_FOUND", "Channel not found.");
-    if (
-      channel.type !== ChannelType.GuildText &&
-      channel.type !== ChannelType.GuildAnnouncement
-    ) {
+    if (!channel) throw new ControlError("CHANNEL_NOT_FOUND", "Channel not found.");
+    if (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement) {
       throw new ControlError(
         "INVALID_CHANNEL",
         "Only guild text and announcement channels are supported.",
       );
     }
     if (expectedGuildId && channel.guildId !== expectedGuildId)
-      throw new ControlError(
-        "INVALID_CHANNEL",
-        "The channel does not belong to this server.",
-      );
+      throw new ControlError("INVALID_CHANNEL", "The channel does not belong to this server.");
     const guild = this.getGuild(channel.guildId);
     const member = guild.members.me ?? (await guild.members.fetchMe());
     this.assertReady();

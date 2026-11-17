@@ -15,11 +15,7 @@ import { randomBytes } from "node:crypto";
 import type { CommandRegistry } from "../core/commandRegistry.js";
 import type { QuickCommandService } from "../core/quickCommands.js";
 import type { PluginManager } from "../plugins/manager.js";
-import type {
-  PluginContext,
-  RichContent,
-  UserSnapshot,
-} from "../plugins/sdk.js";
+import type { PluginContext, RichContent, UserSnapshot } from "../plugins/sdk.js";
 import Logger from "../utils/logger.js";
 import type { MessagingService } from "../core/messaging.js";
 
@@ -88,9 +84,7 @@ export class InteractionRouter {
       users,
       latencyMs: Math.max(0, Date.now() - interaction.createdTimestamp),
     };
-    const flatten = async (
-      entries: typeof interaction.options.data,
-    ): Promise<void> => {
+    const flatten = async (entries: typeof interaction.options.data): Promise<void> => {
       for (const option of entries) {
         if (option.options) await flatten(option.options);
         if (
@@ -100,14 +94,10 @@ export class InteractionRouter {
         )
           options[option.name] = option.value;
         if (includeMembers && option.user) {
-          let targetMember = interaction.guild?.members.cache.get(
-            option.user.id,
-          );
+          let targetMember = interaction.guild?.members.cache.get(option.user.id);
           if (!targetMember && interaction.guild) {
             try {
-              targetMember = await interaction.guild.members.fetch(
-                option.user.id,
-              );
+              targetMember = await interaction.guild.members.fetch(option.user.id);
             } catch {
               /* Identity remains valid when membership is unavailable. */
             }
@@ -119,21 +109,14 @@ export class InteractionRouter {
     await flatten(interaction.options.data);
     return context;
   }
-  private rich(
-    result: RichContent,
-    pluginId: string,
-    context: Context,
-  ): InteractionReplyOptions {
+  private rich(result: RichContent, pluginId: string, context: Context): InteractionReplyOptions {
     const components: Array<
-      | ActionRowBuilder<ButtonBuilder>
-      | ActionRowBuilder<StringSelectMenuBuilder>
+      ActionRowBuilder<ButtonBuilder> | ActionRowBuilder<StringSelectMenuBuilder>
     > = [];
     let buttons: ButtonBuilder[] = [];
     const flush = () => {
       if (buttons.length)
-        components.push(
-          new ActionRowBuilder<ButtonBuilder>().addComponents(buttons),
-        );
+        components.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons));
       buttons = [];
     };
     for (const component of result.components ?? []) {
@@ -184,11 +167,7 @@ export class InteractionRouter {
       allowedMentions: { parse: [] },
     };
   }
-  private quickPage(
-    guildId: string,
-    userId: string,
-    page: number,
-  ): InteractionReplyOptions {
+  private quickPage(guildId: string, userId: string, page: number): InteractionReplyOptions {
     const commands = this.quick.list(guildId, true),
       total = Math.max(1, Math.ceil(commands.length / 20));
     const current = Math.max(0, Math.min(page, total - 1)),
@@ -244,15 +223,11 @@ export class InteractionRouter {
     )
       return;
     try {
-      if (
-        !interaction.guildId ||
-        !this.client.guilds.cache.has(interaction.guildId)
-      ) {
+      if (!interaction.guildId || !this.client.guilds.cache.has(interaction.guildId)) {
         if (interaction.isAutocomplete()) await interaction.respond([]);
         else
           await interaction.reply({
-            content:
-              "This command is only available in a server where NoX Bot is installed.",
+            content: "This command is only available in a server where NoX Bot is installed.",
             flags: MessageFlags.Ephemeral,
           });
         return;
@@ -272,11 +247,7 @@ export class InteractionRouter {
           return;
         }
         if (saved.page !== undefined) {
-          const payload = this.quickPage(
-            saved.guildId,
-            saved.userId,
-            saved.page,
-          );
+          const payload = this.quickPage(saved.guildId, saved.userId, saved.page);
           await interaction.update({
             embeds: payload.embeds,
             components: payload.components,
@@ -293,8 +264,7 @@ export class InteractionRouter {
             return;
           }
           await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-          if (!interaction.channelId)
-            throw new Error("This channel cannot receive messages.");
+          if (!interaction.channelId) throw new Error("This channel cannot receive messages.");
           await this.messaging.send(
             {
               provider: "discord",
@@ -321,9 +291,7 @@ export class InteractionRouter {
           const context = {
             ...saved.context,
             action: saved.handler,
-            values: interaction.isStringSelectMenu()
-              ? interaction.values
-              : undefined,
+            values: interaction.isStringSelectMenu() ? interaction.values : undefined,
           };
           const result = await this.plugins.execute(
             saved.pluginId,
@@ -331,8 +299,7 @@ export class InteractionRouter {
             context,
             "component",
           );
-          if (!result || Array.isArray(result))
-            throw new Error("Invalid plugin response.");
+          if (!result || Array.isArray(result)) throw new Error("Invalid plugin response.");
           const payload = this.rich(result, saved.pluginId, context);
           await interaction.editReply({
             content: payload.content ?? null,
@@ -344,10 +311,7 @@ export class InteractionRouter {
         }
       }
       if (interaction.isAutocomplete()) {
-        const resolved = this.registry.resolve(
-          interaction.guildId,
-          interaction.commandName,
-        );
+        const resolved = this.registry.resolve(interaction.guildId, interaction.commandName);
         if (!resolved) {
           await interaction.respond([]);
           return;
@@ -367,9 +331,7 @@ export class InteractionRouter {
           context,
           "autocomplete",
         );
-        await interaction.respond(
-          Array.isArray(result) ? result.slice(0, 25) : [],
-        );
+        await interaction.respond(Array.isArray(result) ? result.slice(0, 25) : []);
         return;
       }
       if (!interaction.isChatInputCommand()) return;
@@ -382,22 +344,15 @@ export class InteractionRouter {
             });
             return;
           case "commands":
-            await interaction.reply(
-              this.quickPage(interaction.guildId, interaction.user.id, 0),
-            );
+            await interaction.reply(this.quickPage(interaction.guildId, interaction.user.id, 0));
             return;
           case "help": {
-            const fields = this.registry
-              .help(interaction.guildId)
-              .map((plugin) => ({
-                name: plugin.name,
-                value: plugin.commands
-                  .map(
-                    (command) =>
-                      `\`${command.usage}\` — ${command.description}`,
-                  )
-                  .join("\n"),
-              }));
+            const fields = this.registry.help(interaction.guildId).map((plugin) => ({
+              name: plugin.name,
+              value: plugin.commands
+                .map((command) => `\`${command.usage}\` — ${command.description}`)
+                .join("\n"),
+            }));
             await interaction.reply({
               flags: MessageFlags.Ephemeral,
               embeds: [
@@ -414,10 +369,7 @@ export class InteractionRouter {
           }
         }
       }
-      const resolved = this.registry.resolve(
-        interaction.guildId,
-        interaction.commandName,
-      );
+      const resolved = this.registry.resolve(interaction.guildId, interaction.commandName);
       if (!resolved) {
         await interaction.reply({
           content: "This plugin is not enabled in this server.",
@@ -435,8 +387,7 @@ export class InteractionRouter {
         resolved.command.handler,
         context,
       );
-      if (!result || Array.isArray(result))
-        throw new Error("Invalid plugin response.");
+      if (!result || Array.isArray(result)) throw new Error("Invalid plugin response.");
       const payload = this.rich(result, resolved.plugin.id, context);
       await interaction.editReply({
         content: payload.content,
@@ -455,8 +406,7 @@ export class InteractionRouter {
           content: "This operation could not be completed. Please try again.",
           flags: MessageFlags.Ephemeral,
         };
-        if (interaction.deferred || interaction.replied)
-          await interaction.followUp(payload);
+        if (interaction.deferred || interaction.replied) await interaction.followUp(payload);
         else await interaction.reply(payload);
       } catch {
         Logger.warn("Interaction error response could not be delivered.");

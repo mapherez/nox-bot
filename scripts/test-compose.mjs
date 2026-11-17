@@ -5,8 +5,7 @@ import { randomBytes } from "node:crypto";
 
 // Explicit local images only. Never load deployment .env, start the real bot or publish images.
 const architecture = process.argv[2];
-if (!["amd64", "arm64"].includes(architecture))
-  throw new Error("Specify amd64 or arm64.");
+if (!["amd64", "arm64"].includes(architecture)) throw new Error("Specify amd64 or arm64.");
 const project = `nox-bot-compose-test-${randomBytes(4).toString("hex")}`;
 await mkdir(".tmp", { recursive: true });
 const directory = await mkdtemp(resolve(".tmp/compose-run-"));
@@ -18,10 +17,7 @@ const image = `nox-bot:validation-${architecture}`;
 await writeFile(
   file,
   original
-    .replaceAll(
-      "image: ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-latest}",
-      `image: ${image}`,
-    )
+    .replaceAll("image: ghcr.io/mapherez/nox-bot:${NOX_BOT_IMAGE_TAG:-latest}", `image: ${image}`)
     .replaceAll("    image:", `    platform: linux/${architecture}\n    image:`)
     .replace("env_file: [.env]", `env_file: ["${env.replaceAll("\\", "/")}"]`),
 );
@@ -77,9 +73,7 @@ try {
   compose("run", "--rm", "--no-deps", "nox-bot", "write");
   // A new bot container must reuse the same database volume without any initializer.
   compose("run", "--rm", "--no-deps", "nox-bot", "read");
-  console.log(
-    `Compose SQLite initialization and persistence passed on linux/${architecture}.`,
-  );
+  console.log(`Compose SQLite initialization and persistence passed on linux/${architecture}.`);
 } finally {
   try {
     compose("down", "--volumes", "--remove-orphans");

@@ -17,21 +17,16 @@ function json(value: unknown, depth = 0): boolean {
     (record(value) &&
       Object.entries(value).every(
         ([key, item]) =>
-          !["__proto__", "prototype", "constructor"].includes(key) &&
-          json(item, depth + 1),
+          !["__proto__", "prototype", "constructor"].includes(key) && json(item, depth + 1),
       ))
   );
 }
 export function validateStateValue(kind: string, value: unknown): void {
   if (!record(value)) throw new Error("Invalid state value.");
   const text = (key: string, max = 128) =>
-    typeof value[key] === "string" &&
-    value[key].length > 0 &&
-    value[key].length <= max;
+    typeof value[key] === "string" && value[key].length > 0 && value[key].length <= max;
   const time = (key: string) =>
-    typeof value[key] === "number" &&
-    Number.isSafeInteger(value[key]) &&
-    value[key] >= 0;
+    typeof value[key] === "number" && Number.isSafeInteger(value[key]) && value[key] >= 0;
   const fields: Record<string, string[]> = {
     guild: ["guildId", "name"],
     plugin: ["guildId", "pluginId", "enabled", "settings", "secrets"],
@@ -49,17 +44,12 @@ export function validateStateValue(kind: string, value: unknown): void {
     ],
     migration: ["guildId", "source", "importedAt"],
   };
-  if (
-    !kinds.includes(kind) ||
-    Object.keys(value).some((key) => !fields[kind].includes(key))
-  )
+  if (!kinds.includes(kind) || Object.keys(value).some((key) => !fields[kind].includes(key)))
     throw new Error("Invalid state fields.");
   let valid = false;
   switch (kind) {
     case "guild":
-      valid =
-        snowflake(value.guildId) &&
-        (value.name === undefined || text("name", 100));
+      valid = snowflake(value.guildId) && (value.name === undefined || text("name", 100));
       break;
     case "plugin":
       valid =
@@ -76,7 +66,7 @@ export function validateStateValue(kind: string, value: unknown): void {
             !["constructor", "prototype"].includes(field) &&
             typeof secret === "string" &&
             secret.length < 8192 &&
-            /^aes256gcm\./.test(secret),
+            secret.startsWith("aes256gcm."),
         );
       break;
     case "quick":
@@ -122,11 +112,7 @@ export function validateStateDocument(
   key: string,
   value?: unknown,
 ): void {
-  if (
-    !kinds.includes(kind) ||
-    key.length > 256 ||
-    !key.startsWith(`${kind}:${guildId}:`)
-  )
+  if (!kinds.includes(kind) || key.length > 256 || !key.startsWith(`${kind}:${guildId}:`))
     throw new Error("Invalid state key.");
   const id = key.slice(kind.length + guildId.length + 2);
   if (["user", "session"].includes(kind) ? guildId !== "" : !snowflake(guildId))

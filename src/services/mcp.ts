@@ -43,9 +43,7 @@ const pluginSchema = z.object({
   icon: z.string(),
   dashboardEntry: z.string(),
   configurable: z.boolean(),
-  commands: z.array(
-    z.object({ name: z.string(), usage: z.string(), description: z.string() }),
-  ),
+  commands: z.array(z.object({ name: z.string(), usage: z.string(), description: z.string() })),
   configuration: z.object({
     revision: z.string(),
     enabled: z.boolean(),
@@ -92,8 +90,7 @@ export function formatMcpError(error: unknown) {
   // Match the dashboard's safe response for legacy service validation errors.
   return {
     code: "INVALID_REQUEST",
-    message:
-      "The request could not be completed. Check the configuration and try again.",
+    message: "The request could not be completed. Check the configuration and try again.",
     retryable: false,
   };
 }
@@ -101,24 +98,15 @@ export function formatMcpError(error: unknown) {
 export class GuildMcpServer {
   private stopping = false;
   private readonly active = new Set<Promise<unknown>>();
-  private readonly handlers = new Set<
-    ReturnType<typeof createJsonHttpHandler>
-  >();
+  private readonly handlers = new Set<ReturnType<typeof createJsonHttpHandler>>();
   private closing?: Promise<void>;
 
   constructor(private readonly services: McpDependencies) {}
 
   private assertAvailable(allowStarting = false): void {
     const state = this.services.processState();
-    if (
-      this.stopping ||
-      state === "stopping" ||
-      (!allowStarting && state !== "running")
-    )
-      throw new ControlError(
-        "SERVICE_UNAVAILABLE",
-        "The process is starting or stopping.",
-      );
+    if (this.stopping || state === "stopping" || (!allowStarting && state !== "running"))
+      throw new ControlError("SERVICE_UNAVAILABLE", "The process is starting or stopping.");
   }
 
   private track<T>(work: Promise<T>): Promise<T> {
@@ -131,8 +119,7 @@ export class GuildMcpServer {
   }
 
   tools(guildId: string): ToolDefinition[] {
-    const { guilds, operations, messaging, plugins, quick, registry, info } =
-      this.services;
+    const { guilds, operations, messaging, plugins, quick, registry, info } = this.services;
     const tools: ToolDefinition[] = [];
     const add = <S extends z.ZodType>(
       name: string,
@@ -140,10 +127,7 @@ export class GuildMcpServer {
       description: string,
       inputSchema: S,
       outputSchema: z.ZodType,
-      run: (
-        input: z.output<S>,
-        context: ExecutionContext,
-      ) => Promise<Record<string, unknown>>,
+      run: (input: z.output<S>, context: ExecutionContext) => Promise<Record<string, unknown>>,
       readOnly = true,
     ) => {
       tools.push({
@@ -156,9 +140,7 @@ export class GuildMcpServer {
           readOnlyHint: readOnly,
           idempotentHint: readOnly,
           destructiveHint: !readOnly,
-          openWorldHint: ["status", "channel_list", "message_send"].includes(
-            name,
-          ),
+          openWorldHint: ["status", "channel_list", "message_send"].includes(name),
         },
         execute: (input, context) =>
           this.track(
@@ -202,12 +184,8 @@ export class GuildMcpServer {
       }),
       async () => {
         const { discord, bot } = operations.getStatus();
-        const {
-          synchronization,
-          initialized,
-          writable,
-          commandSynchronization,
-        } = guilds.snapshot(guildId);
+        const { synchronization, initialized, writable, commandSynchronization } =
+          guilds.snapshot(guildId);
         return {
           guildId,
           service: info.service,
@@ -314,9 +292,7 @@ export class GuildMcpServer {
         plugins.definition(input.pluginId);
         return {
           guildId,
-          plugin: guilds
-            .snapshot(guildId)
-            .plugins.find((plugin) => plugin.id === input.pluginId),
+          plugin: guilds.snapshot(guildId).plugins.find((plugin) => plugin.id === input.pluginId),
         };
       },
     );
@@ -327,14 +303,7 @@ export class GuildMcpServer {
       pluginWriteInput,
       snapshotSchema,
       async (input) =>
-        mutate(
-          plugins.setEnabled(
-            input.pluginId,
-            guildId,
-            true,
-            input.expectedRevision,
-          ),
-        ),
+        mutate(plugins.setEnabled(input.pluginId, guildId, true, input.expectedRevision)),
       false,
     );
     add(
@@ -344,14 +313,7 @@ export class GuildMcpServer {
       pluginWriteInput,
       snapshotSchema,
       async (input) =>
-        mutate(
-          plugins.setEnabled(
-            input.pluginId,
-            guildId,
-            false,
-            input.expectedRevision,
-          ),
-        ),
+        mutate(plugins.setEnabled(input.pluginId, guildId, false, input.expectedRevision)),
       false,
     );
     add(
@@ -409,18 +371,13 @@ export class GuildMcpServer {
       "Delete a Quick Command using its confirmed revision.",
       z.strictObject({ trigger: z.string(), expectedRevision: z.string() }),
       snapshotSchema,
-      async (input) =>
-        mutate(quick.delete(guildId, input.trigger, input.expectedRevision)),
+      async (input) => mutate(quick.delete(guildId, input.trigger, input.expectedRevision)),
       false,
     );
     return tools;
   }
 
-  handle(
-    guildId: string,
-    request: IncomingMessage,
-    response: ServerResponse,
-  ): Promise<void> {
+  handle(guildId: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
     return this.track(this.serve(guildId, request, response));
   }
 
@@ -453,9 +410,7 @@ export class GuildMcpServer {
 
   stop(): Promise<void> {
     this.stopping = true;
-    return (this.closing ??= Promise.allSettled([...this.active]).then(
-      () => {},
-    ));
+    return (this.closing ??= Promise.allSettled(this.active).then(() => {}));
   }
 
   forceClose(): void {

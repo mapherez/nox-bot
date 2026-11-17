@@ -12,21 +12,15 @@ export function parseQuickCommandBackup(
   value: unknown,
   guildId: string,
 ): QuickCommandBackupEntry[] {
-  if (!Array.isArray(value))
-    throw new Error("Choose a JSON array of Quick Commands.");
+  if (!Array.isArray(value)) throw new Error("Choose a JSON array of Quick Commands.");
   const seen = new Set<string>();
   return value.map((entry: unknown, index) => {
     const invalid = () =>
-      new Error(
-        `Command ${index + 1} must contain a valid trigger, response and enabled flag.`,
-      );
-    if (!entry || typeof entry !== "object" || Array.isArray(entry))
-      throw invalid();
+      new Error(`Command ${index + 1} must contain a valid trigger, response and enabled flag.`);
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw invalid();
     const row = entry as Record<string, unknown>;
     if (
-      Object.keys(row).some(
-        (key) => !["trigger", "response", "enabled"].includes(key),
-      ) ||
+      Object.keys(row).some((key) => !["trigger", "response", "enabled"].includes(key)) ||
       typeof row.trigger !== "string" ||
       typeof row.response !== "string" ||
       typeof row.enabled !== "boolean"
@@ -43,9 +37,7 @@ export function parseQuickCommandBackup(
       throw invalid();
     }
     if (seen.has(command.trigger))
-      throw new Error(
-        `Command ${index + 1} duplicates the trigger !${command.trigger}.`,
-      );
+      throw new Error(`Command ${index + 1} duplicates the trigger !${command.trigger}.`);
     seen.add(command.trigger);
     return command;
   });

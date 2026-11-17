@@ -1,16 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import {
-  Client,
-  StreamableHTTPClientTransport,
-} from "@modelcontextprotocol/client";
-import {
-  ChannelType,
-  PermissionFlagsBits,
-  PermissionsBitField,
-  Status,
-} from "discord.js";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import { ChannelType, PermissionFlagsBits, PermissionsBitField, Status } from "discord.js";
 import { AuthService } from "../dist/core/auth.js";
 import { MessagingService } from "../dist/core/messaging.js";
 import { QuickCommandService } from "../dist/core/quickCommands.js";
@@ -54,10 +46,7 @@ async function fixture(t) {
         available: true,
         members: { me: member, fetchMe: async () => member },
         channels: {
-          fetch: async () =>
-            new Map(
-              [...channels].filter(([, channel]) => channel.guildId === id),
-            ),
+          fetch: async () => new Map([...channels].filter(([, channel]) => channel.guildId === id)),
         },
       },
     ]),
@@ -74,12 +63,7 @@ async function fixture(t) {
       type: ChannelType.GuildText,
       permissionsFor: () =>
         new PermissionsBitField(
-          allowed
-            ? [
-                PermissionFlagsBits.ViewChannel,
-                PermissionFlagsBits.SendMessages,
-              ]
-            : [],
+          allowed ? [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] : [],
         ),
       send: async (payload) => {
         sent.push({ guildId, channelId: id, payload });
@@ -142,9 +126,7 @@ async function fixture(t) {
       ...extra,
     });
     const body = await response.text();
-    const data = response.headers
-      .get("content-type")
-      ?.includes("text/event-stream")
+    const data = response.headers.get("content-type")?.includes("text/event-stream")
       ? JSON.parse(
           body
             .split(/\r?\n/)
@@ -156,12 +138,7 @@ async function fixture(t) {
     return { response, data };
   }
   async function call(name, args = {}, guildId = "1", extra) {
-    const { response, data } = await rpc(
-      "tools/call",
-      { name, arguments: args },
-      guildId,
-      extra,
-    );
+    const { response, data } = await rpc("tools/call", { name, arguments: args }, guildId, extra);
     assert.equal(response.status, 200, JSON.stringify(data));
     return data.result ?? data;
   }
@@ -188,10 +165,7 @@ async function fixture(t) {
 function success(result) {
   assert.notEqual(result.isError, true, JSON.stringify(result));
   assert.equal(result.error, undefined, JSON.stringify(result));
-  assert.deepEqual(
-    JSON.parse(result.content[0].text),
-    result.structuredContent,
-  );
+  assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
   return result.structuredContent;
 }
 function failure(result, code) {
@@ -201,7 +175,7 @@ function failure(result, code) {
   return error;
 }
 
-test("guild MCP accepts JSON and default HTTP clients without requiring SSE", async (t) => {
+void test("guild MCP accepts JSON and default HTTP clients without requiring SSE", async (t) => {
   const f = await fixture(t);
   for (const accept of [
     undefined,
@@ -221,15 +195,8 @@ test("guild MCP accepts JSON and default HTTP clients without requiring SSE", as
       "1",
       { headers },
     );
-    assert.equal(
-      initialized.response.status,
-      200,
-      JSON.stringify(initialized.data),
-    );
-    assert.match(
-      initialized.response.headers.get("content-type"),
-      /^application\/json/,
-    );
+    assert.equal(initialized.response.status, 200, JSON.stringify(initialized.data));
+    assert.match(initialized.response.headers.get("content-type"), /^application\/json/);
     assert.equal(initialized.response.headers.get("mcp-session-id"), null);
     const listed = await f.rpc("tools/list", {}, "1", { headers });
     assert.equal(listed.response.status, 200);
@@ -251,11 +218,7 @@ test("guild MCP accepts JSON and default HTTP clients without requiring SSE", as
     const response = await fetch(`${f.origin}/mcp/guilds/1`, { method });
     assert.equal(response.status, 405);
   }
-  for (const accept of [
-    "text/event-stream",
-    "text/plain",
-    "application/json;q=0, */*;q=1",
-  ]) {
+  for (const accept of ["text/event-stream", "text/plain", "application/json;q=0, */*;q=1"]) {
     const response = await fetch(`${f.origin}/mcp/guilds/1`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: accept },
@@ -266,7 +229,7 @@ test("guild MCP accepts JSON and default HTTP clients without requiring SSE", as
   }
 });
 
-test("MCP SDK clients connect, discover and call guild tools over JSON in both protocol modes", async (t) => {
+void test("MCP SDK clients connect, discover and call guild tools over JSON in both protocol modes", async (t) => {
   const f = await fixture(t);
   for (const mode of ["legacy", "auto"]) {
     const exchanges = [];
@@ -298,20 +261,14 @@ test("MCP SDK clients connect, discover and call guild tools over JSON in both p
       metadata,
     );
     assert.equal(
-      success(await client.callTool({ name: "guild_get_id", arguments: {} }))
-        .guildId,
+      success(await client.callTool({ name: "guild_get_id", arguments: {} })).guildId,
       "1",
     );
     assert.equal(
-      success(await client.callTool({ name: "status", arguments: {} })).process
-        .state,
+      success(await client.callTool({ name: "status", arguments: {} })).process.state,
       "running",
     );
-    assert.ok(
-      exchanges.some(
-        (exchange) => exchange.method === "POST" && exchange.status === 200,
-      ),
-    );
+    assert.ok(exchanges.some((exchange) => exchange.method === "POST" && exchange.status === 200));
     for (const exchange of exchanges.filter(
       (exchange) => exchange.method === "POST" && exchange.status === 200,
     ))
@@ -320,7 +277,7 @@ test("MCP SDK clients connect, discover and call guild tools over JSON in both p
   }
 });
 
-test("guild MCP is always available without auth, exposes exactly 14 strict tools and preserves CLI metadata", async (t) => {
+void test("guild MCP is always available without auth, exposes exactly 14 strict tools and preserves CLI metadata", async (t) => {
   const f = await fixture(t);
   const initialized = await f.rpc("initialize", {
     protocolVersion: "2025-11-25",
@@ -331,9 +288,7 @@ test("guild MCP is always available without auth, exposes exactly 14 strict tool
   assert.equal(initialized.data.result.serverInfo.name, "nox-bot-1");
   const { data } = await f.rpc("tools/list");
   assert.deepEqual(
-    Object.fromEntries(
-      data.result.tools.map((tool) => [tool.name, tool._meta.cli]),
-    ),
+    Object.fromEntries(data.result.tools.map((tool) => [tool.name, tool._meta.cli])),
     metadata,
   );
   for (const tool of data.result.tools) {
@@ -341,13 +296,7 @@ test("guild MCP is always available without auth, exposes exactly 14 strict tool
     assert.equal(tool.inputSchema.properties.guildId, undefined);
     assert.ok(tool.outputSchema);
   }
-  for (const name of [
-    "guild_list",
-    "weather",
-    "dictionary_lookup",
-    "user_info",
-    "ping",
-  ]) {
+  for (const name of ["guild_list", "weather", "dictionary_lookup", "user_info", "ping"]) {
     const result = await f.call(name);
     assert.ok(result.error || result.isError);
   }
@@ -362,16 +311,14 @@ test("guild MCP is always available without auth, exposes exactly 14 strict tool
   assert.equal((await fetch(`${f.origin}/mcp`)).status, 404);
 });
 
-test("guild ID, channels and sends stay bound to the URL and preserve Discord permission checks", async (t) => {
+void test("guild ID, channels and sends stay bound to the URL and preserve Discord permission checks", async (t) => {
   const f = await fixture(t);
   for (const guildId of ["1", "2"]) {
     assert.deepEqual(success(await f.call("guild_get_id", {}, guildId)), {
       guildId,
     });
     assert.deepEqual(
-      success(await f.call("channel_list", {}, guildId)).channels.map(
-        (c) => c.id,
-      ),
+      success(await f.call("channel_list", {}, guildId)).channels.map((c) => c.id),
       [guildId === "1" ? "11" : "22"],
     );
   }
@@ -398,16 +345,14 @@ test("guild ID, channels and sends stay bound to the URL and preserve Discord pe
     }),
     "INVALID_PAYLOAD",
   );
-  failure(
-    await f.call("message_send", { channelId: "abc", content: "x" }),
-    "INVALID_PAYLOAD",
-  );
+  failure(await f.call("message_send", { channelId: "abc", content: "x" }), "INVALID_PAYLOAD");
   assert.equal(f.sent.length, 0);
   const text = " original @everyone <@7> \n";
-  assert.deepEqual(
-    success(await f.call("message_send", { channelId: "11", content: text })),
-    { guildId: "1", channelId: "11", messageId: "33" },
-  );
+  assert.deepEqual(success(await f.call("message_send", { channelId: "11", content: text })), {
+    guildId: "1",
+    channelId: "11",
+    messageId: "33",
+  });
   assert.equal(f.sent.length, 1);
   assert.equal(f.sent[0].guildId, "1");
   assert.equal(f.sent[0].channelId, "11");
@@ -415,7 +360,7 @@ test("guild ID, channels and sends stay bound to the URL and preserve Discord pe
   assert.deepEqual(f.sent[0].payload.allowedMentions, { parse: [] });
 });
 
-test("plugin management reuses validation and workers without executing plugins; reads redact secrets", async (t) => {
+void test("plugin management reuses validation and workers without executing plugins; reads redact secrets", async (t) => {
   const f = await fixture(t);
   let executions = 0;
   const execute = f.plugins.execute.bind(f.plugins);
@@ -428,9 +373,7 @@ test("plugin management reuses validation and workers without executing plugins;
     success(await f.call("command_list")).commands.map((c) => c.name),
     ["nox"],
   );
-  let weather = success(
-    await f.call("plugin_get", { pluginId: "weather" }),
-  ).plugin;
+  let weather = success(await f.call("plugin_get", { pluginId: "weather" })).plugin;
   assert.equal(weather.configuration.revision, "0");
   failure(
     await f.call("plugin_enable", {
@@ -455,16 +398,13 @@ test("plugin management reuses validation and workers without executing plugins;
       expectedRevision: "0",
     }),
   );
-  assert.equal(
-    JSON.stringify(configured).includes("private-weather-key"),
-    false,
-  );
+  assert.equal(JSON.stringify(configured).includes("private-weather-key"), false);
   assert.equal(JSON.stringify(configured).includes("aes256gcm"), false);
   weather = configured.plugins.find((p) => p.id === "weather");
   assert.deepEqual(weather.configuration.secrets.apiKey, { configured: true });
   assert.deepEqual(
-    success(await f.call("plugin_get", { pluginId: "weather" }, "2")).plugin
-      .configuration.secrets.apiKey,
+    success(await f.call("plugin_get", { pluginId: "weather" }, "2")).plugin.configuration.secrets
+      .apiKey,
     { configured: false },
   );
   let updated = success(
@@ -491,23 +431,17 @@ test("plugin management reuses validation and workers without executing plugins;
       expectedRevision: updated.configuration.revision,
     }),
   );
-  assert.deepEqual(
-    removed.plugins.find((p) => p.id === "weather").configuration.secrets
-      .apiKey,
-    { configured: false },
-  );
-  failure(
-    await f.call("plugin_get", { pluginId: "unknown" }),
-    "INVALID_REQUEST",
-  );
+  assert.deepEqual(removed.plugins.find((p) => p.id === "weather").configuration.secrets.apiKey, {
+    configured: false,
+  });
+  failure(await f.call("plugin_get", { pluginId: "unknown" }), "INVALID_REQUEST");
   const enabled = success(
     await f.call("plugin_enable", { pluginId: "ping", expectedRevision: "0" }),
   );
   const ping = enabled.plugins.find((p) => p.id === "ping");
   assert.equal(ping.configuration.enabled, true);
   assert.equal(
-    success(await f.call("plugin_get", { pluginId: "ping" }, "2")).plugin
-      .configuration.enabled,
+    success(await f.call("plugin_get", { pluginId: "ping" }, "2")).plugin.configuration.enabled,
     false,
   );
   assert.deepEqual(
@@ -534,21 +468,15 @@ test("plugin management reuses validation and workers without executing plugins;
   assert.equal(executions, 0);
 });
 
-test("Quick Command CRUD preserves normalization, guild isolation, revisions and confirmed state", async (t) => {
+void test("Quick Command CRUD preserves normalization, guild isolation, revisions and confirmed state", async (t) => {
   const f = await fixture(t);
   const input = { trigger: " HELLO ", response: "first", enabled: true };
   let snapshot = success(await f.call("quick_command_create", input));
   let command = snapshot.quickCommands[0];
   assert.equal(command.trigger, "hello");
-  assert.deepEqual(
-    success(await f.call("quick_command_list", {}, "2")).quickCommands,
-    [],
-  );
+  assert.deepEqual(success(await f.call("quick_command_list", {}, "2")).quickCommands, []);
   failure(await f.call("quick_command_create", input), "STATE_CONFLICT");
-  failure(
-    await f.call("quick_command_create", { ...input, trigger: "help" }),
-    "INVALID_STATE",
-  );
+  failure(await f.call("quick_command_create", { ...input, trigger: "help" }), "INVALID_STATE");
   failure(
     await f.call("quick_command_update", { ...input, expectedRevision: "0" }),
     "STATE_CONFLICT",
@@ -582,7 +510,7 @@ test("Quick Command CRUD preserves normalization, guild isolation, revisions and
   );
 });
 
-test("DB interruptions retain confirmed reads, block writes, recover without replay and preserve unknown outcomes", async (t) => {
+void test("DB interruptions retain confirmed reads, block writes, recover without replay and preserve unknown outcomes", async (t) => {
   const f = await fixture(t);
   const input = { trigger: "hello", response: "confirmed", enabled: true };
   await f.call("quick_command_create", input);
@@ -590,15 +518,10 @@ test("DB interruptions retain confirmed reads, block writes, recover without rep
   const status = success(await f.call("status"));
   assert.equal(status.writable, false);
   assert.equal(status.synchronization, "reconnecting");
-  assert.equal(
-    success(await f.call("quick_command_list")).quickCommands[0].response,
-    "confirmed",
-  );
+  assert.equal(success(await f.call("quick_command_list")).quickCommands[0].response, "confirmed");
   success(await f.call("plugin_list"));
   success(await f.call("command_list"));
-  success(
-    await f.call("message_send", { channelId: "11", content: "still running" }),
-  );
+  success(await f.call("message_send", { channelId: "11", content: "still running" }));
   failure(
     await f.call("quick_command_create", { ...input, trigger: "offline" }),
     "STATE_UNAVAILABLE",
@@ -610,9 +533,7 @@ test("DB interruptions retain confirmed reads, block writes, recover without rep
   await f.recover();
   assert.equal(success(await f.call("status")).writable, true);
   assert.deepEqual(
-    success(await f.call("quick_command_list")).quickCommands.map(
-      (c) => c.trigger,
-    ),
+    success(await f.call("quick_command_list")).quickCommands.map((c) => c.trigger),
     ["hello"],
   );
   let writes = 0;
@@ -629,7 +550,7 @@ test("DB interruptions retain confirmed reads, block writes, recover without rep
   assert.equal(writes, 1);
 });
 
-test("each request revalidates guild installation; missing, invalid and removed guilds are unavailable", async (t) => {
+void test("each request revalidates guild installation; missing, invalid and removed guilds are unavailable", async (t) => {
   const f = await fixture(t);
   for (const [guildId, status, code] of [
     ["3", 404, "GUILD_NOT_FOUND"],
@@ -642,31 +563,22 @@ test("each request revalidates guild installation; missing, invalid and removed 
   success(await f.call("guild_get_id", {}, "2"));
   f.client.guilds.cache.delete("2");
   assert.equal(
-    (
-      await f.rpc(
-        "tools/call",
-        { name: "quick_command_list", arguments: {} },
-        "2",
-      )
-    ).response.status,
+    (await f.rpc("tools/call", { name: "quick_command_list", arguments: {} }, "2")).response.status,
     404,
   );
   f.client.isReady = () => false;
   assert.equal((await f.rpc("tools/list")).response.status, 503);
 });
 
-test("dashboard snapshots expose distinct public MCP URLs without Host-header trust", async (t) => {
+void test("dashboard snapshots expose distinct public MCP URLs without Host-header trust", async (t) => {
   const f = await fixture(t);
   const login = f.auth.beginLogin();
   const state = new URL(login.url).searchParams.get("state");
   const signed = await f.auth.completeLogin("code", state, state);
   for (const guildId of ["1", "2"]) {
-    const response = await fetch(
-      `${f.origin}/dashboard/api/guilds/${guildId}`,
-      {
-        headers: { Cookie: signed.cookie.split(";")[0], Host: "other.example" },
-      },
-    );
+    const response = await fetch(`${f.origin}/dashboard/api/guilds/${guildId}`, {
+      headers: { Cookie: signed.cookie.split(";")[0], Host: "other.example" },
+    });
     assert.equal(response.status, 200);
     assert.deepEqual((await response.json()).mcp, {
       url: `https://bot.example.com/mcp/guilds/${guildId}`,
@@ -674,7 +586,7 @@ test("dashboard snapshots expose distinct public MCP URLs without Host-header tr
   }
 });
 
-test("cancelled MCP sends do not commit after asynchronous channel lookup", async (t) => {
+void test("cancelled MCP sends do not commit after asynchronous channel lookup", async (t) => {
   const f = await fixture(t);
   const gate = deferred();
   let entered = false,
@@ -690,12 +602,9 @@ test("cancelled MCP sends do not commit after asynchronous channel lookup", asyn
     return f.channels.get(id);
   };
   const controller = new AbortController();
-  const work = f.call(
-    "message_send",
-    { channelId: "11", content: "cancelled" },
-    "1",
-    { signal: controller.signal },
-  );
+  const work = f.call("message_send", { channelId: "11", content: "cancelled" }, "1", {
+    signal: controller.signal,
+  });
   const rejected = assert.rejects(work);
   await until(() => entered);
   controller.abort();
@@ -706,7 +615,7 @@ test("cancelled MCP sends do not commit after asynchronous channel lookup", asyn
   assert.deepEqual(f.sent, []);
 });
 
-test("startup permits status and refuses effects; stopping refuses all new MCP requests", async (t) => {
+void test("startup permits status and refuses effects; stopping refuses all new MCP requests", async (t) => {
   const f = await fixture(t);
   f.setProcess("starting");
   assert.equal(success(await f.call("status")).process.state, "starting");
@@ -732,7 +641,7 @@ test("startup permits status and refuses effects; stopping refuses all new MCP r
   assert.deepEqual(f.sent, []);
 });
 
-test("shutdown drains accepted writes and closes idempotently", async (t) => {
+void test("shutdown drains accepted writes and closes idempotently", async (t) => {
   const f = await fixture(t);
   const gate = deferred();
   const mutate = f.transport.mutate.bind(f.transport);

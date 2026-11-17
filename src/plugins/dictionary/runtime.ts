@@ -14,31 +14,17 @@ let dictionary: Dictionary | undefined;
 async function correct(word: string): Promise<string> {
   try {
     if (!dictionary) {
-      const module = createRequire(import.meta.url)(
-        "nodehun",
-      ) as NativeDictionary;
+      const module = createRequire(import.meta.url)("nodehun") as NativeDictionary;
       const [affix, words] = await Promise.all([
-        readFile(
-          new URL(
-            "../../assets/dictionaries/portuguese/pt_PT.aff",
-            import.meta.url,
-          ),
-        ),
-        readFile(
-          new URL(
-            "../../assets/dictionaries/portuguese/pt_PT.dic",
-            import.meta.url,
-          ),
-        ),
+        readFile(new URL("../../assets/dictionaries/portuguese/pt_PT.aff", import.meta.url)),
+        readFile(new URL("../../assets/dictionaries/portuguese/pt_PT.dic", import.meta.url)),
       ]);
       dictionary = new module.Nodehun(affix, words);
     }
     if (await dictionary.spell(word)) return word;
     const suggestions = await dictionary.suggest(word);
     return (
-      suggestions?.find(
-        (s) => /[áéíóúâêôãõç]/.test(s) && Math.abs(s.length - word.length) <= 2,
-      ) ??
+      suggestions?.find((s) => /[áéíóúâêôãõç]/.test(s) && Math.abs(s.length - word.length) <= 2) ??
       suggestions?.[0] ??
       word
     );
@@ -63,9 +49,7 @@ async function definition(context: PluginContext): Promise<RichContent> {
     if (response.status === 404)
       return { content: `“${word}” was not found in the Priberam dictionary.` };
     if (!response.ok) throw new Error("Dictionary service unavailable.");
-    const $ = cheerio.load(
-        new TextDecoder().decode(await readBounded(response, 1024 * 1024)),
-      ),
+    const $ = cheerio.load(new TextDecoder().decode(await readBounded(response, 1024 * 1024))),
       image = $("img.imagemdef").first().attr("src");
     const description = `${word !== original ? `Corrected “${original}” to “${word}”.\n\n` : ""}[View definition on Priberam](${url})`;
     const embed = {
@@ -77,10 +61,7 @@ async function definition(context: PluginContext): Promise<RichContent> {
     if (image) {
       try {
         const imageUrl = new URL(image, url);
-        if (
-          imageUrl.protocol !== "https:" ||
-          imageUrl.hostname !== "dicionario.priberam.org"
-        )
+        if (imageUrl.protocol !== "https:" || imageUrl.hostname !== "dicionario.priberam.org")
           throw new Error("Unexpected definition image source.");
         const result = await fetch(imageUrl, {
           signal: AbortSignal.timeout(10000),
@@ -108,8 +89,7 @@ async function definition(context: PluginContext): Promise<RichContent> {
     };
   } catch {
     return {
-      content:
-        "Could not fetch the definition right now. Please try again later.",
+      content: "Could not fetch the definition right now. Please try again later.",
     };
   }
 }

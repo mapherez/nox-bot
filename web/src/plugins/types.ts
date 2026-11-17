@@ -7,8 +7,5 @@ export interface PluginPanelProps {
   saving: boolean;
   error: string;
   onDirty: (dirty: boolean) => void;
-  save: (
-    settings: Settings,
-    secrets?: Record<string, string | null>,
-  ) => Promise<boolean>;
+  save: (settings: Settings, secrets?: Record<string, string | null>) => Promise<boolean>;
 }

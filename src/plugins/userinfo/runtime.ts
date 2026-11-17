@@ -6,8 +6,7 @@ const runtime: PluginRuntime = {
         typeof context.options.user === "string"
           ? context.users[context.options.user]
           : context.user;
-      if (!user)
-        return { content: "That user is not available in this server." };
+      if (!user) return { content: "That user is not available in this server." };
       return {
         embeds: [
           {

@@ -1,8 +1,4 @@
-import {
-  REST,
-  Routes,
-  type RESTPostAPIChatInputApplicationCommandsJSONBody,
-} from "discord.js";
+import { REST, Routes, type RESTPostAPIChatInputApplicationCommandsJSONBody } from "discord.js";
 import { isRecord } from "../core/state.js";
 import type { CommandRegistry } from "../core/commandRegistry.js";
 
@@ -25,10 +21,7 @@ function records(value: unknown): CommandRecord[] {
   if (
     !Array.isArray(value) ||
     value.some(
-      (item) =>
-        !isRecord(item) ||
-        typeof item.id !== "string" ||
-        typeof item.name !== "string",
+      (item) => !isRecord(item) || typeof item.id !== "string" || typeof item.name !== "string",
     )
   )
     throw new Error("Invalid Discord command response.");
@@ -59,9 +52,7 @@ function canonical(value: unknown): unknown {
       .map(([key, field]) => [key, canonical(field)]),
   );
 }
-function comparable(
-  command: RESTPostAPIChatInputApplicationCommandsJSONBody | CommandRecord,
-) {
+function comparable(command: RESTPostAPIChatInputApplicationCommandsJSONBody | CommandRecord) {
   return canonical({
     type: "type" in command ? (command.type ?? 1) : 1,
     name: command.name,
@@ -94,9 +85,7 @@ export class CommandReconciler {
     const route = Routes.applicationCommands(this.applicationId);
     for (const command of records(await this.rest.get(route)))
       if ((command.type ?? 1) === 1)
-        await this.rest.delete(
-          Routes.applicationCommand(this.applicationId, command.id),
-        );
+        await this.rest.delete(Routes.applicationCommand(this.applicationId, command.id));
   }
   reconcile(guildId: string): Promise<void> {
     if (this.stopping) return Promise.resolve();
@@ -135,30 +124,17 @@ export class CommandReconciler {
       if ((command.type ?? 1) === 1) {
         if (!names.has(command.name) || seen.has(command.name))
           await this.rest.delete(
-            Routes.applicationGuildCommand(
-              this.applicationId,
-              guildId,
-              command.id,
-            ),
+            Routes.applicationGuildCommand(this.applicationId, guildId, command.id),
           );
         else seen.add(command.name);
       }
     for (const command of desired) {
       if (this.stopping) return;
-      const existing = actual.find(
-        (item) => (item.type ?? 1) === 1 && item.name === command.name,
-      );
+      const existing = actual.find((item) => (item.type ?? 1) === 1 && item.name === command.name);
       if (!existing) await this.rest.post(route, { body: command });
-      else if (
-        JSON.stringify(comparable(existing)) !==
-        JSON.stringify(comparable(command))
-      )
+      else if (JSON.stringify(comparable(existing)) !== JSON.stringify(comparable(command)))
         await this.rest.patch(
-          Routes.applicationGuildCommand(
-            this.applicationId,
-            guildId,
-            existing.id,
-          ),
+          Routes.applicationGuildCommand(this.applicationId, guildId, existing.id),
           { body: command },
         );
     }

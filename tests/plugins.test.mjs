@@ -27,21 +27,14 @@ async function fixture(t) {
           });
       sequence++;
       for (const c of changes)
-        c.value === null
-          ? rows.delete(c.key)
-          : rows.set(c.key, { ...c, revision: sequence });
+        c.value === null ? rows.delete(c.key) : rows.set(c.key, { ...c, revision: sequence });
       await callbacks.snapshot([...rows.values()], sequence, 1);
     },
     close: async () => {},
   };
   const state = new StateStore(transport),
     vault = new SecretVault(randomBytes(32).toString("base64"));
-  const manager = new PluginManager(
-    state,
-    vault,
-    builtInPlugins,
-    () => new Set(["1", "2"]),
-  );
+  const manager = new PluginManager(state, vault, builtInPlugins, () => new Set(["1", "2"]));
   t.after(async () => {
     await manager.close();
     await state.close();
@@ -49,7 +42,7 @@ async function fixture(t) {
   await state.start();
   return { state, manager, vault, disconnect: () => callbacks.disconnected() };
 }
-test("plugin process starts lazily, serves two guilds, survives DB loss and exits after the last disable", async (t) => {
+void test("plugin process starts lazily, serves two guilds, survives DB loss and exits after the last disable", async (t) => {
   const f = await fixture(t),
     registry = new CommandRegistry(f.manager);
   assert.equal(f.manager.runtimeStatus("ping").pid, undefined);
@@ -89,44 +82,24 @@ test("plugin process starts lazily, serves two guilds, survives DB loss and exit
     (await f.manager.execute("ping", "ping", context)).content,
     "🏓 Pong! Latency: 42ms",
   );
-  await f.manager.setEnabled(
-    "ping",
-    "1",
-    false,
-    f.state.get("plugin", "1", "ping").revision,
-  );
+  await f.manager.setEnabled("ping", "1", false, f.state.get("plugin", "1", "ping").revision);
   assert.equal(f.manager.runtimeStatus("ping").pid, pid);
   await assert.rejects(f.manager.execute("ping", "ping", context));
-  await f.manager.setEnabled(
-    "ping",
-    "2",
-    false,
-    f.state.get("plugin", "2", "ping").revision,
-  );
+  await f.manager.setEnabled("ping", "2", false, f.state.get("plugin", "2", "ping").revision);
   assert.equal(f.manager.runtimeStatus("ping").pid, undefined);
   assert.throws(() => process.kill(pid, 0));
-  await f.manager.setEnabled(
-    "ping",
-    "1",
-    true,
-    f.state.get("plugin", "1", "ping").revision,
-  );
+  await f.manager.setEnabled("ping", "1", true, f.state.get("plugin", "1", "ping").revision);
   f.disconnect();
   assert.equal(
     (await f.manager.execute("ping", "ping", context)).content,
     "🏓 Pong! Latency: 42ms",
   );
   await assert.rejects(
-    f.manager.setEnabled(
-      "ping",
-      "1",
-      false,
-      f.state.get("plugin", "1", "ping").revision,
-    ),
+    f.manager.setEnabled("ping", "1", false, f.state.get("plugin", "1", "ping").revision),
     { code: "STATE_UNAVAILABLE" },
   );
 });
-test("settings and secrets are separate per guild and browser configuration never includes plaintext or ciphertext", async (t) => {
+void test("settings and secrets are separate per guild and browser configuration never includes plaintext or ciphertext", async (t) => {
   const f = await fixture(t);
   await f.manager.configure("weather", "1", {
     settings: { units: "celsius", defaultLocation: "Lisbon" },
@@ -145,23 +118,18 @@ test("settings and secrets are separate per guild and browser configuration neve
   assert.equal(two.settings.units, "fahrenheit");
   assert.equal(JSON.stringify(one).includes("test-key-private"), false);
   assert.equal(JSON.stringify(one).includes("aes256gcm"), false);
-  await assert.rejects(
-    f.manager.setEnabled("weather", "2", true, two.revision),
-  );
+  await assert.rejects(f.manager.setEnabled("weather", "2", true, two.revision));
   assert.throws(
     () =>
       new PluginManager(
         f.state,
         f.vault,
-        [
-          builtInPlugins[0],
-          { ...builtInPlugins[1], commands: builtInPlugins[0].commands },
-        ],
+        [builtInPlugins[0], { ...builtInPlugins[1], commands: builtInPlugins[0].commands }],
         () => new Set(),
       ),
   );
 });
-test("reconciliation creates, updates and deletes incrementally, then performs no writes when converged", async () => {
+void test("reconciliation creates, updates and deletes incrementally, then performs no writes when converged", async () => {
   let actual = [
     { id: "8", name: "nox", type: 1, description: "old", options: [] },
     { id: "9", name: "legacy", type: 1, description: "stale" },
@@ -179,20 +147,14 @@ test("reconciliation creates, updates and deletes incrementally, then performs n
     },
     patch: async (route, { body }) => {
       writes.push("update");
-      actual = actual.map((c) =>
-        c.id === route.split("/").at(-1) ? { ...body, id: c.id } : c,
-      );
+      actual = actual.map((c) => (c.id === route.split("/").at(-1) ? { ...body, id: c.id } : c));
     },
     delete: async (route) => {
       writes.push("delete");
       actual = actual.filter((c) => c.id !== route.split("/").at(-1));
     },
   };
-  const reconciler = new CommandReconciler(
-    "7",
-    { desired: () => desired },
-    rest,
-  );
+  const reconciler = new CommandReconciler("7", { desired: () => desired }, rest);
   await reconciler.reconcile("1");
   assert.deepEqual(writes, ["delete", "update", "create"]);
   writes.length = 0;
@@ -202,14 +164,10 @@ test("reconciliation creates, updates and deletes incrementally, then performs n
   assert.equal(actual.length, 0);
   await reconciler.close();
 });
-test("Quick Command CRUD updates immediately and rejects cross-guild writes", async (t) => {
+void test("Quick Command CRUD updates immediately and rejects cross-guild writes", async (t) => {
   const { state } = await fixture(t),
     quick = new QuickCommandService(state);
-  await quick.save(
-    "1",
-    { guildId: "1", trigger: "HELLO", response: "first", enabled: true },
-    "0",
-  );
+  await quick.save("1", { guildId: "1", trigger: "HELLO", response: "first", enabled: true }, "0");
   assert.equal(quick.response("1", "hello"), "first");
   assert.equal(quick.response("2", "hello"), undefined);
   await quick.save(
@@ -219,16 +177,12 @@ test("Quick Command CRUD updates immediately and rejects cross-guild writes", as
   );
   assert.equal(quick.response("1", "hello"), "second");
   await assert.rejects(
-    quick.save(
-      "2",
-      { guildId: "1", trigger: "hello", response: "wrong", enabled: true },
-      "0",
-    ),
+    quick.save("2", { guildId: "1", trigger: "hello", response: "wrong", enabled: true }, "0"),
   );
   await quick.delete("1", "hello", quick.list("1")[0].revision);
   assert.equal(quick.response("1", "hello"), undefined);
 });
-test("OAuth admits only the owner, rejects state replay, persists hashed sessions and checks CSRF and expiry offline", async (t) => {
+void test("OAuth admits only the owner, rejects state replay, persists hashed sessions and checks CSRF and expiry offline", async (t) => {
   const f = await fixture(t);
   let identity = { id: "7", username: "Owner", avatar: null },
     clock = 1000000;
@@ -242,8 +196,7 @@ test("OAuth admits only the owner, rejects state replay, persists hashed session
       sessionSecret: randomBytes(32).toString("base64"),
     },
     {
-      authorizeURL: (state) =>
-        `https://discord.example/authorize?state=${state}`,
+      authorizeURL: (state) => `https://discord.example/authorize?state=${state}`,
       identify: async () => identity,
     },
     () => clock,
@@ -262,24 +215,13 @@ test("OAuth admits only the owner, rejects state replay, persists hashed session
     code: "OAUTH_STATE_INVALID",
   });
   assert.throws(
-    () =>
-      auth.validateMutation(
-        result.session,
-        "https://evil.example",
-        result.session.csrf,
-      ),
+    () => auth.validateMutation(result.session, "https://evil.example", result.session.csrf),
     { code: "CSRF_INVALID" },
   );
-  assert.throws(
-    () =>
-      auth.validateMutation(result.session, "https://bot.example.com", "wrong"),
-    { code: "CSRF_INVALID" },
-  );
-  auth.validateMutation(
-    result.session,
-    "https://bot.example.com",
-    result.session.csrf,
-  );
+  assert.throws(() => auth.validateMutation(result.session, "https://bot.example.com", "wrong"), {
+    code: "CSRF_INVALID",
+  });
+  auth.validateMutation(result.session, "https://bot.example.com", result.session.csrf);
   identity = { id: "8", username: "Visitor", avatar: null };
   login = auth.beginLogin();
   state = new URL(login.url).searchParams.get("state");
@@ -294,7 +236,7 @@ test("OAuth admits only the owner, rejects state replay, persists hashed session
   clock = result.session.expiresAt;
   assert.throws(() => auth.authenticate(token), { code: "SESSION_EXPIRED" });
 });
-test("logout waits for an in-flight session activity refresh and still invalidates the session", async (t) => {
+void test("logout waits for an in-flight session activity refresh and still invalidates the session", async (t) => {
   const f = await fixture(t);
   let clock = 1000000;
   const auth = new AuthService(
@@ -325,16 +267,14 @@ test("logout waits for an in-flight session activity refresh and still invalidat
   assert.throws(() => auth.authenticate(token), { code: "SESSION_EXPIRED" });
 });
 
-test("all text workers start with voice unconfigured and reject voice activation without disrupting commands", async (t) => {
+void test("all text workers start with voice unconfigured and reject voice activation without disrupting commands", async (t) => {
   const f = await fixture(t);
   await f.manager.configure("weather", "1", {
     settings: { units: "celsius", defaultLocation: "London" },
     secrets: { apiKey: "fixture-key" },
     expectedRevision: "0",
   });
-  const workers = builtInPlugins.filter(
-    (plugin) => !plugin.capabilities.includes("voice"),
-  );
+  const workers = builtInPlugins.filter((plugin) => !plugin.capabilities.includes("voice"));
   for (const plugin of workers) {
     await f.manager.setEnabled(
       plugin.id,
@@ -358,6 +298,5 @@ test("all text workers start with voice unconfigured and reject voice activation
     /NoX Voice service is unavailable/,
   );
   assert.deepEqual(registry.desired("1"), commands);
-  for (const plugin of workers)
-    assert.equal(f.manager.isActive(plugin.id, "1"), true);
+  for (const plugin of workers) assert.equal(f.manager.isActive(plugin.id, "1"), true);
 });

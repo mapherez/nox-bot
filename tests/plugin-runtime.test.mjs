@@ -17,7 +17,7 @@ const context = {
   secrets: { apiKey: "fixture-key" },
   latencyMs: 12,
 };
-test(
+void test(
   "persistent worker crashes exhaust three retries and confirmed disable/enable resets recovery",
   { timeout: 16000 },
   async (t) => {
@@ -35,8 +35,7 @@ test(
     process.kill(plugins.runtimeStatus("ping").pid, "SIGKILL");
     const deadline = Date.now() + 11000;
     while (
-      (launches.length < 4 ||
-        plugins.runtimeStatus("ping").state !== "error") &&
+      (launches.length < 4 || plugins.runtimeStatus("ping").state !== "error") &&
       Date.now() < deadline
     )
       await new Promise((resolve) => setTimeout(resolve, 25));
@@ -48,55 +47,35 @@ test(
     await new Promise((resolve) => setTimeout(resolve, 400));
     assert.equal(launches.length, 4);
     fail = false;
-    await plugins.setEnabled(
-      "ping",
-      "1",
-      false,
-      state.get("plugin", "1", "ping").revision,
-    );
-    await plugins.setEnabled(
-      "ping",
-      "1",
-      true,
-      state.get("plugin", "1", "ping").revision,
-    );
+    await plugins.setEnabled("ping", "1", false, state.get("plugin", "1", "ping").revision);
+    await plugins.setEnabled("ping", "1", true, state.get("plugin", "1", "ping").revision);
     assert.equal(launches.length, 5);
     assert.equal(plugins.runtimeStatus("ping").state, "active");
   },
 );
-test(
+void test(
   "last disable force-terminates a real worker that ignores dispose and SIGTERM",
   { timeout: 6000 },
   async (t) => {
     const { state, plugins } = await memoryState(t, (file, args, options) =>
       fork(file, args, {
         ...options,
-        execArgv: [
-          "--import=" +
-            new URL("./fixtures/worker-stubborn.mjs", import.meta.url).href,
-        ],
+        execArgv: ["--import=" + new URL("./fixtures/worker-stubborn.mjs", import.meta.url).href],
       }),
     );
     await plugins.setEnabled("ping", "1", true, "0");
     const pid = plugins.runtimeStatus("ping").pid;
-    await plugins.setEnabled(
-      "ping",
-      "1",
-      false,
-      state.get("plugin", "1", "ping").revision,
-    );
+    await plugins.setEnabled("ping", "1", false, state.get("plugin", "1", "ping").revision);
     assert.equal(plugins.runtimeStatus("ping").state, "inactive");
     assert.throws(() => process.kill(pid, 0));
   },
 );
-test("Weather uses confirmed preferences, HTTPS, units and a private refresh action with safe upstream errors", async (t) => {
+void test("Weather uses confirmed preferences, HTTPS, units and a private refresh action with safe upstream errors", async (t) => {
   const calls = [];
   const requests = mock.method(globalThis, "fetch", async (url, options) => {
     calls.push([String(url), options]);
     return String(url).includes("/geo/")
-      ? new Response(
-          JSON.stringify([{ lat: 51, lon: 0, name: "London", country: "GB" }]),
-        )
+      ? new Response(JSON.stringify([{ lat: 51, lon: 0, name: "London", country: "GB" }]))
       : new Response(
           JSON.stringify({
             name: "London",
@@ -121,17 +100,14 @@ test("Weather uses confirmed preferences, HTTPS, units and a private refresh act
   });
   validateRichContent(refresh, builtInPlugins[0]);
   assert.match(calls.at(-1)[0], /units=imperial/);
-  requests.mock.mockImplementation(
-    async () => new Response("{}", { status: 401 }),
-  );
+  requests.mock.mockImplementation(async () => new Response("{}", { status: 401 }));
   const unavailable = await weather.handlers.weather(context);
   assert.equal(JSON.stringify(unavailable).includes("fixture-key"), false);
 });
-test("Dictionary corrects accents using real native assets, attaches Priberam images and falls back safely", async (t) => {
+void test("Dictionary corrects accents using real native assets, attaches Priberam images and falls back safely", async (t) => {
   let requestedWord = "";
   const requests = mock.method(globalThis, "fetch", async (url) => {
-    if (String(url).endsWith(".png"))
-      return new Response(new Uint8Array([1, 2, 3]));
+    if (String(url).endsWith(".png")) return new Response(new Uint8Array([1, 2, 3]));
     requestedWord = decodeURIComponent(String(url).split("/").at(-1));
     return new Response(
       '<html><img class="imagemdef" src="/definition.png"><div class="def">A Portuguese definition.</div></html>',
@@ -163,10 +139,8 @@ test("Dictionary corrects accents using real native assets, attaches Priberam im
   assert.match(fallback.embeds[0].description, /Text fallback/);
   assert.equal(fallback.attachments, undefined);
 });
-test("Core rejects undeclared interactive/attachment capabilities and arbitrary reply flags", () => {
-  assert.throws(() =>
-    validateRichContent({ content: "unsafe", flags: 0 }, builtInPlugins[3]),
-  );
+void test("Core rejects undeclared interactive/attachment capabilities and arbitrary reply flags", () => {
+  assert.throws(() => validateRichContent({ content: "unsafe", flags: 0 }, builtInPlugins[3]));
   assert.throws(() =>
     validateRichContent(
       {
@@ -186,13 +160,10 @@ test("Core rejects undeclared interactive/attachment capabilities and arbitrary 
     ),
   );
   assert.throws(() =>
-    validateRichContent(
-      { embeds: [{ description: "x".repeat(4097) }] },
-      builtInPlugins[0],
-    ),
+    validateRichContent({ embeds: [{ description: "x".repeat(4097) }] }, builtInPlugins[0]),
   );
 });
-test(
+void test(
   "shared process recovers from a crash while DB is offline and confirmed commands remain available",
   { timeout: 10000 },
   async (t) => {

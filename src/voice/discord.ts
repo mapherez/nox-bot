@@ -10,12 +10,7 @@ import {
   VoiceConnectionStatus,
   type AudioReceiveStream,
 } from "@discordjs/voice";
-import {
-  ChannelType,
-  PermissionFlagsBits,
-  type Client,
-  type VoiceBasedChannel,
-} from "discord.js";
+import { ChannelType, PermissionFlagsBits, type Client, type VoiceBasedChannel } from "discord.js";
 import WebSocket from "ws";
 import { DiscordDownsampler, InputMixer } from "./audio.js";
 import { EngineAudio } from "./stream.js";
@@ -32,11 +27,7 @@ export interface Conversation {
 export interface VoiceDiscord {
   channels(guildId: string): Promise<VoiceChannel[]>;
   validate(guildId: string, channelId: string): Promise<void>;
-  join(
-    guildId: string,
-    channelId: string,
-    onFailure: () => void,
-  ): Promise<Conversation>;
+  join(guildId: string, channelId: string, onFailure: () => void): Promise<Conversation>;
 }
 export class DiscordVoice implements VoiceDiscord {
   constructor(private readonly client: Client) {}
@@ -139,15 +130,10 @@ class DiscordConversation implements Conversation {
     if (state.guild.id !== this.channel.guild.id) return;
     if (
       state.id === this.client.user?.id &&
-      (state.channelId !== this.channel.id ||
-        state.serverDeaf ||
-        state.serverMute)
+      (state.channelId !== this.channel.id || state.serverDeaf || state.serverMute)
     )
       this.fail();
-    if (
-      oldState.channelId === this.channel.id &&
-      state.channelId !== this.channel.id
-    ) {
+    if (oldState.channelId === this.channel.id && state.channelId !== this.channel.id) {
       this.subscriptions.get(state.id)?.destroy();
       this.subscriptions.delete(state.id);
       this.mixer.remove(state.id);
@@ -158,13 +144,7 @@ class DiscordConversation implements Conversation {
   }
   private subscribe(id: string) {
     const member = this.channel.members.get(id);
-    if (
-      this.closed ||
-      !this.audio ||
-      !member ||
-      member.user.bot ||
-      this.subscriptions.has(id)
-    )
+    if (this.closed || !this.audio || !member || member.user.bot || this.subscriptions.has(id))
       return;
     const stream = this.connection.receiver.subscribe(id, {
       end: { behavior: EndBehaviorType.AfterSilence, duration: 200 },
@@ -197,12 +177,9 @@ class DiscordConversation implements Conversation {
       () => this.fail(),
     );
     this.audio = audio;
-    this.player.play(
-      createAudioResource(audio.output, { inputType: StreamType.Opus }),
-    );
+    this.player.play(createAudioResource(audio.output, { inputType: StreamType.Opus }));
     for (const member of this.channel.members.values()) {
-      if (this.connection.receiver.speaking.users.has(member.id))
-        this.subscribe(member.id);
+      if (this.connection.receiver.speaking.users.has(member.id)) this.subscribe(member.id);
     }
     return audio.start();
   }
@@ -226,7 +203,6 @@ class DiscordConversation implements Conversation {
     this.closeAudio();
     this.client.off("voiceStateUpdate", this.onVoiceState);
     this.connection.receiver.speaking.off("start", this.onSpeaking);
-    if (this.connection.state.status !== VoiceConnectionStatus.Destroyed)
-      this.connection.destroy();
+    if (this.connection.state.status !== VoiceConnectionStatus.Destroyed) this.connection.destroy();
   }
 }

@@ -1,0 +1,15 @@
+{
+  "workflow": "tests.yml",
+  "marker": "nox-bot-Release:",
+  "branch": "main",
+  "files": [
+    {
+      "path": "package.json",
+      "fields": [["version"]]
+    },
+    {
+      "path": "package-lock.json",
+      "fields": [["version"], ["packages", "", "version"]]
+    }
+  ]
+}

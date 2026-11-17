@@ -21,7 +21,7 @@ const command = (trigger, response = trigger) => ({
   response,
   enabled: true,
 });
-test("SQLite creates its directory/schema automatically and persists across restart with private file permissions", async (t) => {
+void test("SQLite creates its directory/schema automatically and persists across restart with private file permissions", async (t) => {
   const f = await sqliteFixture(t);
   await f.state.start();
   assert.equal(f.state.writable, true);
@@ -38,34 +38,19 @@ test("SQLite creates its directory/schema automatically and persists across rest
   await next.state.close();
   const db = new DatabaseSync(f.filename, { readOnly: true });
   assert.equal(db.prepare("PRAGMA journal_mode").get().journal_mode, "wal");
-  assert.equal(
-    db.prepare("PRAGMA integrity_check").get().integrity_check,
-    "ok",
-  );
+  assert.equal(db.prepare("PRAGMA integrity_check").get().integrity_check, "ok");
   assert.equal(db.prepare("PRAGMA user_version").get().user_version, 1);
   db.close();
 });
-test("SQLite checks all revisions atomically and never commits a partial transaction", async (t) => {
+void test("SQLite checks all revisions atomically and never commits a partial transaction", async (t) => {
   const f = await sqliteFixture(t);
   await f.state.start();
-  await f.state.put(
-    "quick",
-    "1",
-    "existing",
-    command("existing", "Original"),
-    "0",
-  );
+  await f.state.put("quick", "1", "existing", command("existing", "Original"), "0");
   const before = f.state.revision;
   await assert.rejects(
     f.state.commit([
       f.state.change("quick", "1", "new", command("new"), "0"),
-      f.state.change(
-        "quick",
-        "1",
-        "existing",
-        command("existing", "Wrong"),
-        "0",
-      ),
+      f.state.change("quick", "1", "existing", command("existing", "Wrong"), "0"),
     ]),
     { code: "STATE_CONFLICT" },
   );
@@ -77,24 +62,18 @@ test("SQLite checks all revisions atomically and never commits a partial transac
   await next.state.start();
   assert.equal(next.state.get("quick", "1", "new"), undefined);
 });
-test("real SQLite serializes concurrent writes and rejects stale expectations", async (t) => {
+void test("real SQLite serializes concurrent writes and rejects stale expectations", async (t) => {
   const f = await sqliteFixture(t);
   await f.state.start();
   const result = await Promise.allSettled([
     f.state.put("quick", "1", "same", command("same", "First"), "0"),
     f.state.put("quick", "1", "same", command("same", "Second"), "0"),
   ]);
-  assert.equal(
-    result.filter((value) => value.status === "fulfilled").length,
-    1,
-  );
-  assert.equal(
-    result.find((value) => value.status === "rejected").reason.code,
-    "STATE_CONFLICT",
-  );
+  assert.equal(result.filter((value) => value.status === "fulfilled").length, 1);
+  assert.equal(result.find((value) => value.status === "rejected").reason.code, "STATE_CONFLICT");
   assert.equal(f.state.get("quick", "1", "same").data.response, "First");
 });
-test("complete JSON backups over 1000 commands commit atomically to SQLite and survive reopening", async (t) => {
+void test("complete JSON backups over 1000 commands commit atomically to SQLite and survive reopening", async (t) => {
   const f = await sqliteFixture(t);
   await f.state.start();
   const quick = new QuickCommandService(f.state);
@@ -103,11 +82,7 @@ test("complete JSON backups over 1000 commands commit atomically to SQLite and s
     response: `Answer ${i}`,
     enabled: i % 2 === 0,
   }));
-  await quick.import(
-    "1",
-    backup,
-    Object.fromEntries(backup.map((row) => [row.trigger, "0"])),
-  );
+  await quick.import("1", backup, Object.fromEntries(backup.map((row) => [row.trigger, "0"])));
   assert.equal(new Set(quick.list("1").map((row) => row.revision)).size, 1);
   await f.state.close();
   const next = f.create();
@@ -116,7 +91,7 @@ test("complete JSON backups over 1000 commands commit atomically to SQLite and s
   assert.equal(exported.length, 1001);
   assert.equal(exported.find((row) => row.trigger === "q1").enabled, false);
 });
-test("encrypted plugin secrets remain encrypted on disk and decrypt after SQLite restart", async (t) => {
+void test("encrypted plugin secrets remain encrypted on disk and decrypt after SQLite restart", async (t) => {
   const f = await sqliteFixture(t);
   await f.state.start();
   const vault = new SecretVault(Buffer.alloc(32, 1).toString("base64"));
@@ -136,10 +111,7 @@ test("encrypted plugin secrets remain encrypted on disk and decrypt after SQLite
     "0",
   );
   await f.state.close();
-  assert.equal(
-    (await readFile(f.filename)).includes(Buffer.from(plain)),
-    false,
-  );
+  assert.equal((await readFile(f.filename)).includes(Buffer.from(plain)), false);
   const next = f.create();
   await next.state.start();
   assert.equal(
@@ -152,7 +124,7 @@ test("encrypted plugin secrets remain encrypted on disk and decrypt after SQLite
     plain,
   );
 });
-test("unexpected SQLite worker exit recovers committed data without replaying writes", async (t) => {
+void test("unexpected SQLite worker exit recovers committed data without replaying writes", async (t) => {
   const f = await sqliteFixture(t);
   await f.state.start();
   await f.state.put("quick", "1", "hello", command("hello"), "0");
@@ -166,7 +138,7 @@ test("unexpected SQLite worker exit recovers committed data without replaying wr
   assert.equal(f.state.get("quick", "1", "hello").data.response, "hello");
   assert.equal(f.state.get("quick", "1", "new"), undefined);
 });
-test("a projection failure after SQL COMMIT reports uncertainty and recovery reads the durable result", async (t) => {
+void test("a projection failure after SQL COMMIT reports uncertainty and recovery reads the durable result", async (t) => {
   const f = await sqliteFixture(t);
   await f.state.start();
   const publish = f.transport.callbacks.snapshot;
@@ -178,16 +150,15 @@ test("a projection failure after SQL COMMIT reports uncertainty and recovery rea
     }
     return publish(...args);
   };
-  await assert.rejects(
-    f.state.put("quick", "1", "saved", command("saved"), "0"),
-    { code: "WRITE_UNCONFIRMED" },
-  );
+  await assert.rejects(f.state.put("quick", "1", "saved", command("saved"), "0"), {
+    code: "WRITE_UNCONFIRMED",
+  });
   assert.equal(f.state.get("quick", "1", "saved"), undefined);
   await untilSqlite(() => f.state.writable);
   assert.equal(f.state.get("quick", "1", "saved").data.response, "saved");
   assert.equal(f.state.revision, "1");
 });
-test("SQLite recovery does not silently create an empty database if its persistent file disappears", async (t) => {
+void test("SQLite recovery does not silently create an empty database if its persistent file disappears", async (t) => {
   const f = await sqliteFixture(t, 30);
   await f.state.start();
   await f.state.put("quick", "1", "keep", command("keep"), "0");
@@ -198,7 +169,7 @@ test("SQLite recovery does not silently create an empty database if its persiste
   assert.equal(f.state.get("quick", "1", "keep").data.response, "keep");
   await assert.rejects(stat(f.filename));
 });
-test("SQLite fails clearly on corrupt files, unavailable directories and foreign schemas without resetting data", async (t) => {
+void test("SQLite fails clearly on corrupt files, unavailable directories and foreign schemas without resetting data", async (t) => {
   const f = await sqliteFixture(t);
   const invalid = join(f.directory, "corrupt.sqlite");
   await writeFile(invalid, "not a SQLite database");
@@ -215,9 +186,7 @@ test("SQLite fails clearly on corrupt files, unavailable directories and foreign
   await unavailable.close();
   const other = join(f.directory, "foreign.sqlite");
   const db = new DatabaseSync(other);
-  db.exec(
-    "CREATE TABLE important (value TEXT); INSERT INTO important VALUES ('keep');",
-  );
+  db.exec("CREATE TABLE important (value TEXT); INSERT INTO important VALUES ('keep');");
   db.close();
   const foreign = new StateStore(new SqliteTransport({ filename: other }));
   await assert.rejects(foreign.start(), { code: "INVALID_STATE" });
@@ -226,7 +195,7 @@ test("SQLite fails clearly on corrupt files, unavailable directories and foreign
   assert.equal(read.prepare("SELECT value FROM important").get().value, "keep");
   read.close();
 });
-test("SQLite only acknowledges saved state after lifecycle projections finish", async (t) => {
+void test("SQLite only acknowledges saved state after lifecycle projections finish", async (t) => {
   const f = await sqliteFixture(t);
   await f.state.start();
   let release,
@@ -239,11 +208,9 @@ test("SQLite only acknowledges saved state after lifecycle projections finish", 
     });
   });
   let settled = false;
-  const pending = f.state
-    .put("quick", "1", "pending", command("pending"), "0")
-    .then(() => {
-      settled = true;
-    });
+  const pending = f.state.put("quick", "1", "pending", command("pending"), "0").then(() => {
+    settled = true;
+  });
   await untilSqlite(() => entered);
   assert.equal(settled, false);
   assert.equal(f.state.writable, false);
@@ -252,19 +219,18 @@ test("SQLite only acknowledges saved state after lifecycle projections finish", 
   assert.equal(settled, true);
   assert.equal(f.state.writable, true);
 });
-test("SQLite deployment configuration has one local file setting and no service credentials", () => {
+void test("SQLite deployment configuration has one local file setting and no service credentials", () => {
   assert.deepEqual(loadSqliteConfig({}), {
     filename: resolve("data/nox-bot.sqlite"),
   });
-  assert.deepEqual(
-    loadSqliteConfig({ NOX_BOT_DATABASE_PATH: ".tmp/custom folder/db.sqlite" }),
-    { filename: resolve(".tmp/custom folder/db.sqlite") },
-  );
+  assert.deepEqual(loadSqliteConfig({ NOX_BOT_DATABASE_PATH: ".tmp/custom folder/db.sqlite" }), {
+    filename: resolve(".tmp/custom folder/db.sqlite"),
+  });
   for (const value of ["", "  ", ":memory:", "bad\0path"])
     assert.throws(() => loadSqliteConfig({ NOX_BOT_DATABASE_PATH: value }));
 });
 
-test("real SQLite backs dashboard import/SSE and persists authenticated sessions across restart", async (t) => {
+void test("real SQLite backs dashboard import/SSE and persists authenticated sessions across restart", async (t) => {
   const f = await sqliteFixture(t),
     config = {
       ownerId: "7",
@@ -351,9 +317,6 @@ test("real SQLite backs dashboard import/SSE and persists authenticated sessions
   const next = f.create();
   await next.state.start();
   const restoredAuth = new AuthService(next.state, config, oauth);
-  assert.equal(
-    restoredAuth.authenticate(headers.Cookie.split("=")[1]).userId,
-    "7",
-  );
+  assert.equal(restoredAuth.authenticate(headers.Cookie.split("=")[1]).userId, "7");
   assert.deepEqual(new QuickCommandService(next.state).export("1"), commands);
 });
